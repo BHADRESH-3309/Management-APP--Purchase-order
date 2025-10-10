@@ -1,0 +1,204 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Views\Sales\qxssvslt.j1k~" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="wwwroot\assets\vendor\tinymce\icons\default\icons.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\icons\default\icons.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\icons\default\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\models\dom\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\models\dom\model.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\models\dom\model.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\accordion\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\accordion\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\accordion\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\advlist\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\advlist\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\advlist\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\anchor\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\anchor\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\anchor\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autolink\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autolink\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autolink\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autoresize\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autoresize\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autoresize\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autosave\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autosave\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\autosave\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\charmap\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\charmap\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\charmap\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\codesample\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\codesample\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\codesample\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\code\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\code\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\code\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\directionality\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\directionality\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\directionality\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\js\emojiimages.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\js\emojiimages.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\js\emojis.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\js\emojis.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\emoticons\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\fullscreen\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\fullscreen\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\fullscreen\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ar.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\bg_BG.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ca.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\cs.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\da.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\de.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\el.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\en.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\es.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\eu.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\fa.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\fi.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\fr_FR.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\he_IL.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\hi.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\hr.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\hu_HU.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\id.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\it.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ja.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\kk.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ko_KR.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ms.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\nb_NO.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\nl.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\pl.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\pt_BR.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\pt_PT.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ro.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\ru.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\sk.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\sl_SI.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\sv_SE.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\th_TH.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\tr.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\uk.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\vi.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\zh_CN.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\js\i18n\keynav\zh_TW.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\help\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\image\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\image\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\image\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\importcss\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\importcss\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\importcss\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\insertdatetime\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\insertdatetime\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\insertdatetime\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\link\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\link\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\link\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\lists\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\lists\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\lists\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\media\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\media\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\media\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\nonbreaking\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\nonbreaking\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\nonbreaking\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\pagebreak\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\pagebreak\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\pagebreak\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\preview\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\preview\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\preview\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\quickbars\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\quickbars\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\quickbars\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\save\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\save\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\save\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\searchreplace\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\searchreplace\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\searchreplace\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\table\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\table\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\table\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualblocks\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualblocks\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualblocks\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualchars\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualchars\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\visualchars\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\wordcount\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\wordcount\plugin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\plugins\wordcount\plugin.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\README.md" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\dark\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\default\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\document\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\tinymce-5-dark\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\tinymce-5\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\content\writer\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide-dark\content.inline.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide-dark\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide-dark\skin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide-dark\skin.shadowdom.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide\content.inline.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide\skin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\oxide\skin.shadowdom.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5-dark\content.inline.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5-dark\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5-dark\skin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5-dark\skin.shadowdom.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5\content.inline.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5\content.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5\skin.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\skins\ui\tinymce-5\skin.shadowdom.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\themes\silver\index.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\themes\silver\theme.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\themes\silver\theme.min.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\tinymce.js" />
+    <None Include="wwwroot\assets\vendor\tinymce\tinymce.min.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="7.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageReference Include="System.Data.OleDb" Version="8.0.0" />
+    <PackageReference Include="Microsoft.TypeScript.MSBuild" Version="5.5.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <TypeScriptCompile Include="wwwroot\assets\vendor\tinymce\tinymce.d.ts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\PurchaseOrderInvoice\" />
+    <Folder Include="wwwroot\productimages\" />
+    <Folder Include="wwwroot\ReceivedExcel\" />
+  </ItemGroup>
+
+</Project>

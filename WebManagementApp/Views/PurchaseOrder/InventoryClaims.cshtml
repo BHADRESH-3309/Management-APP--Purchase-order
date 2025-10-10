@@ -1,0 +1,414 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Inventory Claims";
+}
+
+@{
+    var showPOBaseUrl = Url.Action("PurchaseOrder", "PurchaseOrder");
+}
+
+@section Styles
+{
+    <style>
+
+        .title {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        #inventoryClaims-table th:nth-child(3),
+        #inventoryClaims-table td:nth-child(3) 
+        {
+            .datatable-sorter
+            {
+                width: 160px !important;
+            }
+        }
+
+        #inventoryClaims-table th:nth-child(4),
+        #inventoryClaims-table td:nth-child(4) 
+        {
+            .datatable-sorter
+            {
+                width: 155px !important;
+            }
+        }
+
+        #inventoryClaims-table th:nth-child(5),
+        #inventoryClaims-table td:nth-child(5) 
+        {
+            .datatable-sorter
+            {
+                width: 130px !important;
+            }
+        }
+
+        #inventoryClaims-table th:nth-child(7),
+        #inventoryClaims-table td:nth-child(7) 
+        {
+            .datatable-sorter
+            {
+                width: 200px !important;
+            }
+        }
+
+        @@media screen and (max-width: 1620px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+    </style>
+}
+
+<div class="card positionrow">
+    <div class="card-body mt-2">
+        <!-- Table with stripped rows -->
+        <table id="inventoryClaims-table" class="table" style="width:100%">
+        </table>
+
+        <div id="table-loading-spinner" class="table-overlay">
+            <div class="spinner-border" role="status">
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script type="module">
+        var showPOBaseUrl = '@showPOBaseUrl';
+
+        $(document).ready(function () {
+            // Functions to get Inventory claim data.
+            GenerateInventoryClaimsData();
+        })
+
+        import { DataTable } from "../assets/vendor/simple-datatables/module.js"
+        let _InventoryClaimsDatatable = null;
+        let _InventoryClaimsData = [];
+        let _InventoryClaimsRawData = [];
+        let savedPage = 1;
+
+        /**
+        * Fetches the get Inventory claim data from the server.
+        */
+        function GenerateInventoryClaimsData() {
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetInventoryClaim", "PurchaseOrder")",
+                dataType: "json",
+                success: function (response) {
+
+                    if (response.isError) {
+                        GenerateInventoryClaimsTable(response);
+                        toastr.error(response.message);
+                    } else {
+                        GenerateInventoryClaimsTable(response);
+                    }
+
+                    $('#table-loading-spinner').addClass('d-none');
+                },
+                failure: handleAjaxError,
+                error: handleAjaxError
+            });
+        }
+
+        /**
+        * Handles AJAX errors by logging the response text
+        * @@param {Array} result - The AJAX result array
+        */ 
+        function handleAjaxError(result) {
+            $('#table-loading-spinner').addClass('d-none');
+            console.error(result.responseText);
+        }
+
+        /**
+        * Generates the DataTable for Inventory Claims data.
+        * * @@param {Array} data - The Inventory Claims data
+        */
+        function GenerateInventoryClaimsTable(response, pageToShow = 1, editIdToShow = null) {
+
+            if (_InventoryClaimsDatatable) {
+                _InventoryClaimsDatatable.destroy();
+            }
+
+            _InventoryClaimsRawData = response.result;
+
+            /* Build the table rows: if a row's ID matches the 'editIdToShow', render it in editable mode (with input/select elements).
+             * Otherwise, render the row as read-only (plain text display). */
+            _InventoryClaimsData = response.result.map((row, index) => {
+                const isEditing = row.idInventoryClaims == editIdToShow;
+
+                return [
+                    index + 1,
+                    `<p><a href="${showPOBaseUrl}?po=${row.poNumber}" title="Click to Show Purchase Order Details" target="_blank">${row.poNumber}</a></p>`,
+                    isEditing
+                        ? `<select class="form-select" style="width: 160px;">
+                              <option ${row.issueType === 'Select' ? 'selected' : ''}>Select</option>
+                              <option ${row.issueType === 'Missing' ? 'selected' : ''}>Missing</option>
+                              <option ${row.issueType === 'Damage' ? 'selected' : ''}>Damage</option>
+                              <option ${row.issueType === 'Missing Damage' ? 'selected' : ''}>Missing Damage</option>
+                              <option ${row.issueType === 'Other' ? 'selected' : ''}>Other</option>
+                          </select>`
+                        : row.issueType || '',
+                    isEditing
+                        ? `<input type="text" class="form-control  claim-amount" onkeypress="return isNumberAndDecimal(event, this)" value="${row.claimAmount ?? ''}" />`
+                        : row.claimAmount ?? '',
+                    isEditing
+                        ? `<select class="form-select status-select" style="width: 130px;">
+                              <option ${row.status === 'Select' ? 'selected' : ''}>Select</option>
+                              <option ${row.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                              <option ${row.status === 'Settled' ? 'selected' : ''}>Settled</option>
+                          </select>`
+                        : row.status || '',
+                    isEditing
+                        ? `<input type="date" class="form-control settlement-date" value="${row.settlementDate ? row.settlementDate.split('T')[0] : ''}" style="width: 160px;"/>`
+                        : (row.settlementDate ? formatDate(row.settlementDate) : ''),
+                    isEditing
+                        ? `<input type="text" class="form-control" value="${row.note ?? ''}" style="width: 300px;"/>`
+                        : `<p class="title">${row.note ?? ''}</p>`,
+                    isEditing
+                        ? `<button class="btn btn-primary btnUpdate" data-id="${row.idInventoryClaims}">
+                              <i class="bi bi-check-lg"></i>
+                           </button>`
+                        : `<div class="btn-group" role="group" aria-label="PO Actions">
+                               <button type="button" class="btn btn-info btnEdit" data-id="${row.idInventoryClaims}"
+                                   data-bs-toggle="tooltip" title="Edit">
+                                   <i class="bi bi-pencil-square"></i>
+                               </button>
+                           </div>`
+                ];
+            });
+
+            const header = ["#", "PO Number", "Issue Type", "Claim Amount", "Status", "Settlement Date", "Note", "Action"]
+
+            _InventoryClaimsDatatable = new DataTable("#inventoryClaims-table", {
+                data: {
+                    headings: header,
+                    data: _InventoryClaimsData
+                },
+                perPage: 20,  // Set the default number of records per page
+                perPageSelect: [20, 40, 60],
+            });
+
+            // Listen for page changes and save the current page
+            _InventoryClaimsDatatable.on('datatable.page', (pageNumber) => {
+                savedPage = pageNumber;
+            });
+
+            // After table initialized, jump to saved page
+            if (pageToShow && pageToShow > 1) {
+                _InventoryClaimsDatatable.page(pageToShow);
+            }
+
+            var searchDiv = document.querySelector(".datatable-search");
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+
+                let excelData = [];
+                if (_InventoryClaimsDatatable.totalPages > 0) {
+                    excelData = _InventoryClaimsDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells.map(cell => cell.text).slice(0, -1) // Exclude the last cell
+                        )
+                    ).flat();
+                }
+
+                // Export to Excel functionality
+                const combinedArray = [["#", "PO Number", "Issue Type", "Claim Amount", "Status", "Settlement Date", "Note"], ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [2]; // Columns that need to be numbers
+                const decimalColumns = [4]; // Columns that need to be decimals
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Inventory claims.xlsx');
+            };
+            searchDiv.appendChild(button);
+
+            $(document).on('mouseenter', '.title', function () {
+                const $this = $(this);
+                if ($this.width() < $this[0].scrollWidth) {
+                    $this.css('white-space', 'normal');
+                }
+            });
+            $(document).on('mouseleave', '.title', function () {
+                const $this = $(this);
+                $this.css('white-space', 'nowrap');
+            });
+
+            // Edit button click handler
+            $(document).off('click', '.btnEdit').on('click', '.btnEdit', function () {
+                const editId = $(this).data('id');
+
+                // Datatable generate function call
+                GenerateInventoryClaimsTable({ result: _InventoryClaimsRawData }, savedPage, editId);
+            });
+        }
+
+        // Update (Purchase order) button click event
+        $(document).on('click', '.btnUpdate', function () {
+            const $row = $(this).closest('tr');
+            const tds = $row.find('td');
+
+            // Get inventory claim values 
+            const idInventoryClaims = $(this).data('id');
+            const issueType = tds.eq(2).find('select').val();
+            const status = tds.eq(4).find('select').val();
+            const settlementDate = tds.eq(5).find('input').val();
+
+            // Validation: issueType and status should not be 'Select'
+            if (issueType === 'Select') {
+                toastr.error("Issue type is required. Please select a valid option.");
+                return;
+            }
+            if (status === 'Select') {
+                toastr.error("Status is required. Please select a valid option.");
+                return;
+            }
+
+            if (status === 'Settled' && (!settlementDate || settlementDate.trim() === "")) {
+                toastr.error("Settlement Date is required when status is Settled.");
+                return;
+            }
+
+            // Prepare the updated data object
+            const updatedData = {
+                idInventoryClaims: idInventoryClaims,
+                poNumber: tds.eq(1).text().trim(),
+                issueType: issueType,
+                claimAmount: tds.eq(3).find('input').val(),
+                status: status,
+                settlementDate: settlementDate,
+                note: tds.eq(6).find('input').val()
+            };
+
+            // AJAX call to update the data
+            $.ajax({
+                type: "POST",
+                url: "@Url.Action("UpdateInventoryClaim", "PurchaseOrder")",
+                data: updatedData,
+                success: function (response) {
+                    if (response.isError) {
+                        toastr.error(response.message);
+                    } else {
+                        toastr.success(response.message);
+
+                        // Datatable generate function call
+                        GenerateInventoryClaimsTable({ result: response.result }, 1 , null);
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error(xhr.responseText);
+                    toastr.error("An error occurred while updating. Please try again.");
+                }
+            });
+        });
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+
+        function isNumberAndDecimal(evt, element) {
+            const charCode = evt.which ? evt.which : evt.keyCode;
+            const value = element.value;
+
+            // Prevent multiple decimals
+            if (charCode === 46 && value.indexOf('.') !== -1) {
+                return false;
+            }
+
+            // Allow: digits (48–57) and one dot (46)
+            if ((charCode >= 48 && charCode <= 57) || charCode === 46) {
+                return true;
+            }
+
+            // Disallow anything else (including minus, letters, symbols)
+            return false;
+        }
+
+        function formatDate(dateString) {
+
+            if (!dateString) {
+                return '';
+            }
+            const date = new Date(dateString);
+
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-based
+            const year = date.getFullYear();
+
+            return `${day}-${month}-${year}`;
+
+            // Combine formatted date and time
+            return `${formattedDate} ${formattedTime}`;
+        }
+
+        function validateRow(rowElement) {
+            const status = rowElement.querySelector(".status-select")?.value;
+            const settlementDate = rowElement.querySelector(".settlement-date")?.value;
+
+            if (status === "Settled" && !settlementDate) {
+                toastr.warning("Settlement Date is required when status is Settled.");
+                return false;
+            }
+            return true;
+        }
+
+        $(document).on("input", ".claim-amount", function () {
+            let val = this.value;
+
+            // Keep only numbers and one dot
+            val = val.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+
+            // If starts with ".", auto prefix 0 (so ".1" -> "0.1")
+            if (val.startsWith(".")) {
+                val = "0" + val;
+            }
+
+            // Block 0, 0., 0.0, 0.00 etc.
+            if (/^0*(\.0+)?$/.test(val) || val === "") {
+                val = "";
+            }
+
+            this.value = val;
+        });
+
+        $(document).on("blur", ".claim-amount", function () {
+            if (this.value === "0.") {
+                this.value = "";
+            }
+        });
+
+    </script>
+}

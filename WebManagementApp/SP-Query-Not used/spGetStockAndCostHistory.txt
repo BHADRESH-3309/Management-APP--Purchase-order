@@ -1,0 +1,91 @@
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		AEScope
+-- Create date: 5-September-2024
+-- Description:	Get stock and cost history
+-- =============================================
+CREATE PROCEDURE spGetStockAndCostHistory
+	@MasterSKU NVARCHAR(50) = NULL
+
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+    -- Insert statements for procedure here
+	WITH Last30Days AS (
+		-- Generate the last 30 days of dates
+		SELECT CONVERT(DATE, GETDATE()) AS DateAdd
+		UNION ALL SELECT DATEADD(DAY, -1, DateAdd) FROM Last30Days
+		WHERE DATEADD(DAY, -1, DateAdd) >= DATEADD(DAY, -30, GETDATE())
+	),
+	RankedStock AS (
+		-- Rank stock data by StockLocation and DateAdd
+		SELECT 
+			CONVERT(DATE, slh.DateAdd) AS StockDate, slh.StockLocation, slh.TotalQuantity, slh.AvgCostPrice,
+			ROW_NUMBER() OVER (PARTITION BY slh.StockLocation ORDER BY slh.DateAdd DESC) AS RowNum
+			FROM tblStockLocationHistory slh WHERE slh.MasterSKU = @MasterSKU
+	),
+	RankedFBA AS (
+		SELECT DateAdd, SUM(LatestInventory.Quantity) AS TotalQuantity
+		FROM (SELECT CONVERT(DATE, aih.DateAdd) AS DateAdd, aih.Quantity, aih.idAmazonInventory,
+				ROW_NUMBER() OVER (PARTITION BY aih.idAmazonInventory, CONVERT(DATE, aih.DateAdd) ORDER BY aih.DateAdd DESC) AS RowNum
+			FROM tblAmazonInventoryHistory aih
+			INNER JOIN tblAmazonInventory ai ON aih.idAmazonInventory = ai.idAmazonInventory
+			INNER JOIN tblMappingSKU mps ON mps.SKU = ai.SKU
+			INNER JOIN tblMasterSKU ms ON ms.idMasterSKU = mps.idMasterSKU
+			WHERE ms.SKU = @MasterSKU AND ai.FulfillmentBy = 'FBA'
+		) AS LatestInventory WHERE RowNum = 1 GROUP BY DateAdd
+	)
+	-- Final Select to Combine Results
+	SELECT 
+		FORMAT(d.DateAdd, 'dd/MM/yyyy') AS DateAdd,
+		-- Get the total FBA quantity for the date or the latest available if not present
+		ISNULL(
+			(SELECT rf.TotalQuantity 
+			 FROM RankedFBA rf 
+			 WHERE rf.DateAdd = d.DateAdd),
+			(SELECT TOP 1 rf.TotalQuantity 
+			 FROM RankedFBA rf 
+			 WHERE rf.DateAdd < d.DateAdd 
+			 ORDER BY rf.DateAdd DESC)
+		) AS FBA,
+		-- Calculate the TotalStockValue as the sum of Amersham, Watford, and FBA, handling NULLs
+		CASE 
+			WHEN 
+				ISNULL((SELECT TOP 1 rs.TotalQuantity FROM RankedStock rs 
+						WHERE rs.StockLocation = 'Amersham' AND rs.StockDate <= d.DateAdd AND RowNum =1 
+						ORDER BY rs.StockDate DESC), NULL) IS NULL
+				AND ISNULL((SELECT TOP 1 rs.TotalQuantity FROM RankedStock rs 
+						WHERE rs.StockLocation = 'Watford' AND rs.StockDate <= d.DateAdd AND RowNum =1 
+						ORDER BY rs.StockDate DESC), NULL) IS NULL
+				AND ISNULL((SELECT rf.TotalQuantity FROM RankedFBA rf 
+					 WHERE rf.DateAdd = d.DateAdd),
+					(SELECT TOP 1 rf.TotalQuantity FROM RankedFBA rf 
+					 WHERE rf.DateAdd < d.DateAdd ORDER BY rf.DateAdd DESC)
+				) IS NULL
+			THEN NULL
+			ELSE 
+				COALESCE((SELECT TOP 1 rs.TotalQuantity FROM RankedStock rs 
+						WHERE rs.StockLocation = 'Amersham' AND rs.StockDate <= d.DateAdd AND RowNum =1 
+						ORDER BY rs.StockDate DESC), 0)
+				+ COALESCE((SELECT TOP 1 rs.TotalQuantity FROM RankedStock rs 
+						WHERE rs.StockLocation = 'Watford' AND rs.StockDate <= d.DateAdd AND RowNum =1 
+						ORDER BY rs.StockDate DESC), 0)
+				+ COALESCE(
+					(SELECT rf.TotalQuantity FROM RankedFBA rf WHERE rf.DateAdd = d.DateAdd),
+					(SELECT TOP 1 rf.TotalQuantity FROM RankedFBA rf WHERE rf.DateAdd < d.DateAdd 
+					 ORDER BY rf.DateAdd DESC), 0)
+		END AS TotalStockValue,
+		-- Get the most recent average cost price
+		ISNULL((SELECT TOP 1 rs.AvgCostPrice FROM RankedStock rs WHERE rs.StockDate <= d.DateAdd 
+				ORDER BY rs.StockDate DESC), 0) AS ProductCost
+	FROM Last30Days d
+	ORDER BY d.DateAdd;
+
+END
+GO

@@ -1,0 +1,49 @@
+﻿CREATE PROCEDURE spGetStockByLocationAndCost
+	 @CompanyName NVARCHAR(100)
+AS
+BEGIN
+	SET NOCOUNT ON; 
+
+	WITH AvgCostData AS (
+       --SELECT sl.idMasterSKU, (sl.AvgCostPrice * COALESCE(SUM(tb.ReduceQuantity), 1)) AS AvgCostPrice
+	   SELECT sl.idMasterSKU, (sl.AvgCostPrice) AS AvgCostPrice
+			FROM (
+			SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+					ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+			FROM tblStockLocation					--WHERE Lower(CompanyName) = LOWER(@CompanyName)
+			) sl
+		--LEFT JOIN tblBundle tb ON sl.idMasterSKU = tb.idMasterSKU AND ((LOWER(@CompanyName) = 'Greenwize' AND LOWER(tb.SalesChannel) != 'amazon') 
+		--		OR (LOWER(tb.SalesChannel) = 'amazon' AND LOWER(tb.CompanyName) = LOWER(@CompanyName)))
+		WHERE sl.row_num = 1
+		GROUP BY sl.idMasterSKU, sl.AvgCostPrice
+    )
+    SELECT ms.sku AS MasterSKU, ms.Title, qty_data.AmershamQty, qty_data.WatfordQty, fba_data.FBA, 
+    COALESCE(qty_data.AmershamQty ,0) + COALESCE(qty_data.WatfordQty ,0) + COALESCE(fba_data.FBA ,0) AS TotalQty,
+    acd.AvgCostPrice as ProductCost, ms.GTIN, b.Brand,
+    ((COALESCE(qty_data.AmershamQty ,0) + COALESCE(qty_data.WatfordQty ,0) + COALESCE(fba_data.FBA ,0)) * COALESCE(acd.AvgCostPrice ,0)) AS TotalStockValue
+    FROM tblMastersku ms
+	LEFT JOIN tblBrand b ON ms.idBrand = b.idBrand
+    LEFT JOIN 
+    (SELECT sl.idMasterSKU,
+    CASE 
+	    WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' AND Lower(sl.CompanyName) = LOWER(@CompanyName) THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+	    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' AND Lower(sl.CompanyName) = LOWER(@CompanyName) THEN sl.Quantity ELSE 0 END), 0)
+	    END AS AmershamQty,
+    CASE 
+	    WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' AND Lower(sl.CompanyName) = LOWER(@CompanyName) THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+	    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' AND Lower(sl.CompanyName) = LOWER(@CompanyName) THEN sl.Quantity ELSE 0 END), 0)
+	    END AS WatfordQty
+    FROM tblStockLocation sl GROUP BY sl.idMasterSKU) AS qty_data 
+    ON ms.idMasterSKU = qty_data.idMasterSKU
+    LEFT JOIN (SELECT mps.idMasterSKU,
+	    CASE
+	    WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+	    ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+	    END AS FBA
+    FROM tblMappingsku mps LEFT JOIN tblAmazonInventory ai ON mps.sku = ai.sku AND Lower(ai.CompanyName) = LOWER(@CompanyName) AND LOWER(ai.Source) = 'GB'
+    WHERE LOWER(mps.SalesChannel) = 'amazon' AND LOWER(mps.CompanyName) = LOWER(@CompanyName) GROUP BY mps.idMasterSKU) AS fba_data 
+    ON ms.idMasterSKU = fba_data.idMasterSKU 
+    LEFT JOIN AvgCostData acd ON ms.idMasterSKU = acd.idMasterSKU
+    ORDER BY ms.sku ASC;
+
+END;

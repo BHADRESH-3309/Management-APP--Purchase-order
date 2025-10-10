@@ -1,0 +1,56 @@
+﻿SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:      Brijal
+-- Create date: 20-August-2025
+-- Description: Get cost activity for Master SKUs within a date range, filtered by master SKU.
+-- =============================================
+CREATE PROCEDURE dbo.SPGetMasterCostActivityReport
+	 @FromDate DATE,
+     @ToDate DATE,
+	 @MasterSKU NVARCHAR(100)
+	
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+	-- Insert statements for procedure here
+	SELECT 
+		s.MasterSKU,
+		s.Username AS [User],
+		'Add' AS ActionPerformed,
+		s.CostPrice AS CurrentCost,
+
+		-- Old Cost Price: get the latest cost before this record
+		(
+			SELECT TOP 1 sl.CostPrice FROM tblStockLocationHistory sl
+			WHERE sl.MasterSKU = s.MasterSKU
+			  AND sl.CostPrice IS NOT NULL
+			  AND IsOrderProcessHistory <> 1 AND OrderId IS NULL
+			  AND (SupplierName IS NOT NULL OR (SupplierName IS NULL AND ReduceReason IS NULL))
+			  AND sl.DateAdd < s.DateAdd
+			ORDER BY sl.DateAdd DESC
+		) AS OldCostPrice,
+
+		s.DateAdd AS Date
+
+	FROM tblStockLocationHistory s
+
+	WHERE s.CostPrice IS NOT NULL
+		AND CAST(s.DateAdd AS DATE) BETWEEN @FromDate AND @ToDate
+		AND (@MasterSKU = 'all' OR EXISTS 
+				(SELECT 1 FROM STRING_SPLIT(@MasterSKU, ',') s WHERE LOWER(MasterSKU) = LOWER(LTRIM(RTRIM(s.value))))
+			)
+		AND IsOrderProcessHistory <> 1 AND OrderId IS NULL
+		AND (
+			   SupplierName IS NOT NULL
+			OR (SupplierName IS NULL AND ReduceReason IS NULL)
+		)
+
+	ORDER BY s.MasterSKU, s.DateAdd DESC;
+
+END

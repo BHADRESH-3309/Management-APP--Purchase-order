@@ -1,0 +1,68 @@
+﻿CREATE PROCEDURE [dbo].[spGetCustomDateDashboardData]
+	@StartDate DATE = NULL,
+    @EndDate DATE = NULL
+AS
+BEGIN
+	
+	SET NOCOUNT ON;
+
+	WITH SalesData AS (
+		SELECT  s.idSales,
+				CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN s.Quantity * tb.ReduceQuantity 
+					ELSE s.Quantity
+				END
+				AS Quantity,
+				CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN COALESCE(sl.AvgCostPrice, 0) * (tb.ReduceQuantity * s.Quantity)
+					ELSE COALESCE(sl.AvgCostPrice, 0) * s.Quantity
+				END AS COGS,
+				CAST(s.OrderDate AS DATE) AS AdjustedOrderDate,
+			    CASE 
+					WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'amazon' THEN ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)
+					WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'merchant' THEN ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'eBay' THEN ISNULL(s.ListingFee, 0) + ISNULL(s.FinalValueFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.AdvertisingFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'OnBuy' THEN ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'Shopify' THEN ISNULL(s.ShippingFee, 0)
+					ELSE 0
+				END AS Expenses,
+				asp.AvgSellingPrice * s.Quantity AS Revenue,
+				CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN ((COALESCE(asp.AvgSellingPrice, 0) - COALESCE(sl.AvgCostPrice, 0)) * (tb.ReduceQuantity * s.Quantity))
+					ELSE (COALESCE(asp.AvgSellingPrice, 0) - COALESCE(sl.AvgCostPrice, 0)) * s.Quantity
+				END AS GrossProfit,
+			   ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+		FROM tblSales s
+		JOIN tblMappingSKU map ON s.MarketplaceSKU = map.SKU
+		JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU AND s.SalesChannel = map.SalesChannel
+		JOIN fnGetInventoryAvgSellingPrice() asp ON asp.idMasterSKU = m.idMasterSKU
+		LEFT JOIN (
+			SELECT idMasterSKU, SalesChannel, MarketplaceSKU, ReduceQuantity 
+			FROM tblBundle
+		) AS tb ON m.idMasterSKU = tb.idMasterSKU AND s.SalesChannel = tb.SalesChannel 
+		LEFT JOIN (
+			SELECT idMasterSKU, AvgCostPrice
+			FROM (
+				SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+					   ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+				FROM tblStockLocation
+			) sl
+			WHERE row_num = 1 -- Selects the latest record based on ModifyTime
+		) sl ON m.idMasterSKU = sl.idMasterSKU where FulfillmentChannel IS NULL OR FulfillmentChannel IN ('merchant', 'amazon')		
+	) 
+	SELECT
+		-- Data filtered by start and end dates
+		SUM(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN GrossProfit ELSE 0 END) AS TotalGrossProfit,
+		SUM(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN COGS ELSE 0 END) AS TotalCOGS,
+		SUM(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN Expenses ELSE 0 END) AS TotalExpenses,
+		SUM(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN Revenue ELSE 0 END) AS TotalRevenue,
+		COUNT(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN AdjustedOrderDate ELSE NULL END) AS Sales,
+		SUM(CASE WHEN AdjustedOrderDate BETWEEN @StartDate AND @EndDate THEN Quantity ELSE NULL END) AS UnitsSold
+	FROM SalesData
+	WHERE rn = 1
+
+END
+GO

@@ -1,0 +1,36 @@
+﻿CREATE PROCEDURE spGetNonPerformingSKUsData
+	@CompanyName NVARCHAR(100)
+AS
+BEGIN
+
+    -- Author: Dharmil Patel
+	WITH SalesData AS (
+	SELECT s.idSales, m.SKU, s.OrderDate, s.Quantity, m.Image, m.Title, m.GTIN, b.Brand, s.CompanyName,
+	(COALESCE(sl.AvgCostPrice, 0) *  map.Quantity) AS AvgCostPrice,
+	ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+	FROM tblSales s
+	JOIN FN_GetTblMappingSKUWithBundleQuantity() map ON s.MarketplaceSKU = map.SKU AND LOWER(s.SalesChannel) = LOWER(map.SalesChannel)
+			AND LOWER(s.CompanyName) = LOWER(map.CompanyName)
+			--AND (LOWER(map.SalesChannel) != 'amazon' OR LOWER(s.CompanyName) = LOWER(map.CompanyName))
+	JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU
+	LEFT JOIN tblBrand b ON m.idBrand = b.idBrand
+	LEFT JOIN (
+				SELECT idMasterSKU, AvgCostPrice
+				FROM (
+					SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+							ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+					FROM tblStockLocation
+				) sl
+				WHERE row_num = 1 -- Selects the latest record based on ModifyTime
+			) sl ON m.idMasterSKU = sl.idMasterSKU
+	WHERE (s.ItemStatus IS NULL OR LOWER(s.ItemStatus) IN ('', 'shipped', 'unshipped'))
+			AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
+		    AND (LOWER(s.SalesChannel) != 'amazon' OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 
+	)
+	SELECT SKU, SUM(Quantity) AS TotalSalesQuantity, 
+	Image, Title, AvgCostPrice, GTIN, Brand, CompanyName
+	FROM SalesData
+	WHERE rn = 1 GROUP BY SKU, Image, Title, AvgCostPrice, GTIN, Brand, CompanyName ORDER BY TotalSalesQuantity ASC;
+
+END
+GO

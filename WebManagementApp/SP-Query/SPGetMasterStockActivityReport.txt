@@ -1,0 +1,83 @@
+﻿SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:      Brijal
+-- Create date: 19-August-2025
+-- Description: Get stock activity for Master SKUs within a date range, filtered by master SKU, stock location, and sales channel.
+-- =============================================
+CREATE PROCEDURE dbo.SPGetMasterStockActivityReport
+	 @FromDate DATE,
+     @ToDate DATE,
+	 @MasterSKU NVARCHAR(100),
+	 @StockLocation NVARCHAR(100),
+	 @SalesChannel NVARCHAR(100)
+	
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+    -- Insert statements for procedure here
+	SELECT 
+        s.MasterSKU,
+        sa.SalesChannel,
+        s.Username AS [User],
+
+        -- Action Performed
+        CASE 
+            WHEN s.IsOrderProcessHistory = 0 AND s.ReduceReason IS NULL THEN 'Add'
+            WHEN s.IsOrderProcessHistory = 1 OR s.ReduceReason IS NOT NULL THEN 'Reduce'
+            ELSE NULL
+        END AS ActionPerformed,
+
+        -- Old Quantity: get the latest quantity before this record
+		(CASE 
+			WHEN EXISTS (
+				SELECT 1
+				FROM tblStockLocationHistory prev
+				WHERE prev.MasterSKU     = s.MasterSKU
+				  AND LOWER(prev.StockLocation) = LOWER(s.StockLocation)
+				  AND LOWER(prev.CompanyName)   = LOWER(s.CompanyName)
+				  AND prev.DateAdd = s.DateAdd   -- exact same datetime exists
+				  AND prev.idStockLocationHistory <> s.idStockLocationHistory	-- not same row
+			)
+			THEN 
+				CASE 
+					WHEN s.IsOrderProcessHistory = 0 AND s.ReduceReason IS NULL 
+						 THEN s.TotalQuantity - s.Quantity   -- Add → reverse add
+					WHEN s.IsOrderProcessHistory = 1 OR s.ReduceReason IS NOT NULL
+						 THEN s.TotalQuantity + s.Quantity   -- Reduce → reverse reduce
+				END
+			ELSE 
+				(
+					SELECT TOP 1 sl.TotalQuantity
+					FROM tblStockLocationHistory sl
+					WHERE sl.MasterSKU     = s.MasterSKU
+					  AND LOWER(sl.StockLocation) = LOWER(s.StockLocation)
+					  AND LOWER(sl.CompanyName)   = LOWER(s.CompanyName)
+					  AND sl.DateAdd < s.DateAdd
+					ORDER BY sl.DateAdd DESC
+				)
+			END
+		) AS OldQuantity,
+
+        s.TotalQuantity AS CurrentQuantity,
+        s.MarketplaceSKU,
+        s.StockLocation,
+        s.DateAdd AS [Date]
+
+    FROM tblStockLocationHistory s LEFT JOIN tblSales sa ON s.OrderId = sa.OrderId AND s.MarketplaceSKU = sa.MarketplaceSKU
+
+    WHERE CAST(s.DateAdd AS DATE) BETWEEN @FromDate AND @ToDate
+		AND (@MasterSKU = 'all' OR EXISTS 
+				(SELECT 1 FROM STRING_SPLIT(@MasterSKU, ',') s WHERE LOWER(MasterSKU) = LOWER(LTRIM(RTRIM(s.value))))
+			)
+		AND (@StockLocation = 'All' OR LOWER(s.StockLocation) = LOWER(@StockLocation))
+		AND (@SalesChannel  = 'All' OR LOWER(sa.SalesChannel) = LOWER(@SalesChannel) AND LOWER(@CompanyName) = LOWER(sa.CompanyName)) 
+
+    ORDER BY s.MasterSKU, s.DateAdd DESC;
+
+END

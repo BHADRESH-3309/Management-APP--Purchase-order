@@ -1,0 +1,23 @@
+﻿USE [dbManagementApp]
+GO
+/****** Object:  Trigger [dbo].[AfterStockLocationInsert]    Script Date: 18-Apr-2025 14:44:12 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER TRIGGER [dbo].[AfterStockLocationInsert] ON [dbo].[tblStockLocation]
+FOR INSERT
+AS DECLARE @idStockLocation UNIQUEIDENTIFIER, @idMasterSKU UNIQUEIDENTIFIER,
+@StockLocation nvarchar(100),@Quantity nvarchar(100) ,@DamagedQuantity nvarchar(100), 
+@MasterSKU nvarchar(100), @CostPrice float, @AvgCostPrice float, @SupplierName nvarchar(250), @TotalQuantity nvarchar(100), 
+@CompanyName nvarchar(100), @Username nvarchar(100);
+ 
+SELECT @idStockLocation = ins.idStockLocation, @idMasterSKU = ins.idMasterSKU ,
+@StockLocation = ins.StockLocation, @Quantity = ins.Quantity ,
+@DamagedQuantity = ins.DamagedQuantity,@MasterSKU = msku.SKU, @CostPrice = ins.CostPrice, @AvgCostPrice = ins.AvgCostPrice, 
+@SupplierName = ins.SupplierName, @TotalQuantity = ins.Quantity, @CompanyName=ins.CompanyName, @Username = ins.Username
+    FROM INSERTED ins
+    JOIN tblMasterSKU msku ON ins.idMasterSKU = msku.idMasterSKU;
+ 
+INSERT INTO [tblStockLocationHistory] (idStockLocation,StockLocation,MasterSKU,Quantity,DamagedQuantity,CostPrice, AvgCostPrice, SupplierName, TotalQuantity, CompanyName, Username)
+VALUES(@idStockLocation,@StockLocation,@MasterSKU,@Quantity,@DamagedQuantity, @CostPrice, @AvgCostPrice, @SupplierName, @TotalQuantity, @CompanyName, @Username);

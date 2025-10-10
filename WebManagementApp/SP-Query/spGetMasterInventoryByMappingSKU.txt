@@ -1,0 +1,177 @@
+﻿USE [dbManagementApp]
+GO
+
+/****** Object:  StoredProcedure [dbo].[spGetMasterInventoryData]    Script Date: 04/02/2025 11:29:35 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+-- =============================================
+-- Author:		<Author,,Vaibhavi>
+-- Create date: 4-February-2025
+-- Description:	Get Master Inventory data
+-- =============================================
+CREATE PROCEDURE [dbo].[spGetMasterInventoryByMappingSKU]
+    @MarketSKU NVARCHAR (100)= NULL,
+    @isDamagedQuantity BIT = 0,
+    @isMarketplaceQuantity BIT = 0
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+    -- Insert statements for procedure here
+    WITH InventoryPrices AS (
+        SELECT 
+            m.sku AS MasterSKU,
+			m.Title, sf.ShippingFee, m.idMasterSKU,  m.EAN, m.GTIN
+        FROM tblMastersku m
+			LEFT JOIN tblShippingFees sf ON m.idMasterSKU = sf.idMasterSKU
+        GROUP BY m.sku, m.Title, sf.ShippingFee , m.idMasterSKU, m.EAN, m.GTIN
+        ),
+        FBAQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE
+                    WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+                END AS FBA
+            FROM tblMastersku m 
+            LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon' AND LOWER(ms.CompanyName) = LOWER('greenwize') 
+            LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku AND LOWER(ai.CompanyName) = 'greenwize' AND LOWER(ai.Source) = 'GB'
+            GROUP BY m.sku 
+        ),
+		FBAQuantitiesAVASupplies AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE
+                    WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+                END AS FBAAVASupplies
+            FROM tblMastersku m
+            LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon' AND LOWER(ms.CompanyName) = LOWER('ava supplies') 
+            LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku AND LOWER(ai.CompanyName) = 'ava supplies' AND LOWER(ai.Source) = 'GB'
+            GROUP BY m.sku
+        ),
+        StockQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU, sl.AvgCostPrice,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE 0 END), 0)
+                END AS AmershamQty,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE 0 END), 0)
+                END AS WatfordQty,
+				CASE WHEN @isDamagedQuantity = 0 THEN
+					CASE 
+						WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.DamagedQuantity ELSE NULL END) IS NULL THEN NULL
+						ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.DamagedQuantity ELSE 0 END), 0)
+					 END
+                END AS DamagedAmershamQty,
+				CASE WHEN @isDamagedQuantity = 0 THEN
+					CASE 
+						WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.DamagedQuantity ELSE NULL END) IS NULL THEN NULL
+						ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.DamagedQuantity ELSE 0 END), 0)
+					END
+                END AS DamagedWatfordQty
+            FROM tblMastersku m
+            LEFT JOIN tblStockLocation sl ON m.idMasterSKU = sl.idMasterSKU
+            GROUP BY m.sku,  sl.AvgCostPrice
+        ),
+        MarketplaceQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE WHEN @isMarketplaceQuantity = 0 THEN
+					CASE 
+						WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' AND LOWER(mp.CompanyName) = 'greenwize' 
+							AND LOWER(ai.CompanyName) = 'greenwize' THEN ai.Quantity END) = 0 THEN NULL
+						ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' AND LOWER(mp.CompanyName) = 'greenwize' 
+							AND LOWER(ai.CompanyName) = 'greenwize' THEN ai.Quantity END), 0), 0)
+					END
+                END AS AmazonQty,
+				CASE WHEN @isMarketplaceQuantity = 0 THEN
+					CASE 
+						WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' AND LOWER(mp.CompanyName) = 'ava supplies' 
+							AND LOWER(ai.CompanyName) = 'ava supplies' THEN ai.Quantity END) = 0 THEN NULL
+						ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' AND LOWER(mp.CompanyName) = 'ava supplies' 
+							AND LOWER(ai.CompanyName) = 'ava supplies' THEN ai.Quantity END), 0), 0)
+					END
+                END AS AmazonQtyAVASupplies,
+				CASE WHEN @isMarketplaceQuantity = 0 THEN
+					CASE 
+						WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'ebay' THEN ei.Quantity END) = 0 THEN NULL
+						ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'ebay' THEN ei.Quantity END), 0), 0)
+					END
+                END AS eBayQty,
+				CASE WHEN @isMarketplaceQuantity = 0 THEN
+					CASE 
+						WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.Quantity END) = 0 THEN NULL
+						ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.Quantity END), 0), 0)
+					END
+                END AS OnBuyQty,
+				CASE WHEN @isMarketplaceQuantity = 0 THEN
+					CASE 
+						WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'shopify' THEN si.Quantity END) = 0 THEN NULL
+						ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'shopify' THEN si.Quantity END), 0), 0)
+					END
+                END AS ShopifyQty
+            FROM tblMastersku m
+            LEFT JOIN tblMappingsku mp ON m.idMasterSKU = mp.idMasterSKU
+            LEFT JOIN tblAmazonInventory ai ON mp.sku = ai.SKU AND ai.Source = 'GB'
+            LEFT JOIN tblEbayInventory ei ON mp.sku = ei.SKU 
+            LEFT JOIN tblOnbuyInventory oi ON mp.sku = oi.SKU 
+			LEFT JOIN tblShopifyInventory si ON mp.sku = si.SKU 
+            GROUP BY m.sku
+        ),
+		MappingData AS (
+			SELECT M.SKU AS MasterSKU, 
+				STRING_AGG(CAST(MS.SKU AS nvarchar(MAX)), ', ') AS MappingSKU,
+				STRING_AGG(LOWER(CONCAT(MS.SalesChannel, ' ', MS.CompanyName)), ',') AS SalesChannel
+			FROM tblMasterSKU AS M JOIN tblMappingSKU AS MS ON M.idMasterSKU = MS.idMasterSKU 
+			GROUP BY M.idMasterSKU, M.SKU
+		)
+        SELECT 
+            ip.MasterSKU,
+			ip.Title,
+			ip.ShippingFee,
+			ip.EAN,
+			ip.GTIN,
+            fba.FBA,
+			fbaavas.FBAAVASupplies,
+            sq.AmershamQty,
+            sq.WatfordQty,
+			CASE
+                WHEN sq.AmershamQty IS NULL AND sq.WatfordQty IS NULL AND fba.FBA IS NULL AND fbaavas.FBAAVASupplies IS NULL THEN NULL
+                ELSE COALESCE(sq.AmershamQty, 0) + COALESCE(sq.WatfordQty, 0) + COALESCE(fba.FBA, 0) + COALESCE(fbaavas.FBAAVASupplies, 0)
+            END AS TotalQty,
+            sq.DamagedAmershamQty,
+            sq.DamagedWatfordQty,
+			sq.AvgCostPrice,
+            mpq.AmazonQty,
+			mpq.AmazonQtyAVASupplies,
+            mpq.eBayQty,
+            mpq.OnBuyQty,
+			mpq.ShopifyQty,
+			md.MappingSKU,
+			md.SalesChannel
+        FROM 
+            InventoryPrices ip
+            LEFT JOIN FBAQuantities fba ON ip.MasterSKU = fba.MasterSKU
+			LEFT JOIN FBAQuantitiesAVASupplies fbaavas ON ip.MasterSKU = fbaavas.MasterSKU
+            LEFT JOIN StockQuantities sq ON ip.MasterSKU = sq.MasterSKU
+            LEFT JOIN MarketplaceQuantities mpq ON ip.MasterSKU = mpq.MasterSKU
+			LEFT JOIN MappingData md ON ip.MasterSKU = md.MasterSKU
+			join tblMappingSKU s on ip.idMasterSKU = s.idMasterSKU
+			where s.SKU = @MarketSKU
+        ORDER BY ip.MasterSKU
+
+END
+GO
+
+

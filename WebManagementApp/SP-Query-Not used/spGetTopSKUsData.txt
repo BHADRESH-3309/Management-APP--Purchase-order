@@ -1,0 +1,125 @@
+﻿CREATE PROCEDURE spGetTopSKUsData
+    @StartDate DATE = NULL,
+    @EndDate DATE = NULL
+AS
+BEGIN
+    -- Author: Dharmil Patel
+
+    -- Step 1: Sales data extraction and aggregation
+    WITH SalesData AS (
+        SELECT 
+            s.idSales,
+            m.SKU,
+            s.OrderDate,
+            s.Quantity,
+            m.Image,
+            m.Title,
+            sl.AvgCostPrice,
+            asp.AvgSellingPrice,
+            (sl.AvgCostPrice * s.Quantity) AS COGS,
+            (asp.AvgSellingPrice * s.Quantity) AS Revenue,
+            ((COALESCE(asp.AvgSellingPrice, 0) - COALESCE(sl.AvgCostPrice, 0)) * s.Quantity) AS GrossProfit,
+            m.GTIN,
+            b.Brand,
+            m.idMasterSKU,
+            map.SalesChannel,
+            s.MarketplaceSKU,
+            -- Calculate Expenses based on SalesChannel and FulfillmentChannel
+            CASE 
+                WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'amazon' THEN 
+                    ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)
+                WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'merchant' THEN 
+                    ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)
+                WHEN s.SalesChannel = 'eBay' THEN 
+                    ISNULL(s.ListingFee, 0) + ISNULL(s.FinalValueFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.AdvertisingFee, 0) + ISNULL(s.ShippingFee, 0)
+                WHEN s.SalesChannel = 'OnBuy' THEN 
+                    ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)
+                WHEN s.SalesChannel = 'Shopify' THEN 
+                    ISNULL(s.ShippingFee, 0)
+                ELSE 0
+            END AS Expenses,
+            ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+        FROM 
+            tblSales s
+        INNER JOIN 
+            tblMappingSKU map ON s.MarketplaceSKU = map.SKU
+        INNER JOIN 
+            tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU
+        INNER JOIN 
+            fnGetInventoryAvgSellingPrice() asp ON asp.idMasterSKU = m.idMasterSKU
+        LEFT JOIN 
+            tblBrand b ON m.idBrand = b.idBrand
+        LEFT JOIN (
+            SELECT 
+                sl.idMasterSKU, 
+                slh.AvgCostPrice
+            FROM 
+                tblStockLocation sl
+            INNER JOIN (
+                SELECT 
+                    idStockLocation, 
+                    AvgCostPrice, 
+                    ROW_NUMBER() OVER (PARTITION BY idStockLocation ORDER BY DateAdd DESC) AS row_num
+                FROM 
+                    tblStockLocationHistory
+                WHERE 
+                    CONVERT(date, DateAdd) <= @EndDate
+            ) slh ON sl.idStockLocation = slh.idStockLocation
+            WHERE 
+                slh.row_num = 1
+        ) sl ON m.idMasterSKU = sl.idMasterSKU
+        WHERE 
+            CONVERT(date, s.OrderDate) BETWEEN @StartDate AND @EndDate
+    )
+
+    -- Step 2: Aggregated SKU-level data
+    SELECT 
+        TOP 5 sd.SKU,
+        SUM(CASE 
+                WHEN tb.MarketplaceSKU = sd.MarketplaceSKU AND tb.SalesChannel = sd.SalesChannel 
+                THEN sd.Quantity * tb.ReduceQuantity 
+                ELSE sd.Quantity
+            END) AS TotalSalesQuantity,
+        MAX(CASE 
+                WHEN tb.MarketplaceSKU = sd.MarketplaceSKU AND tb.SalesChannel = sd.SalesChannel 
+                THEN sd.AvgCostPrice * tb.ReduceQuantity 
+                ELSE sd.AvgCostPrice
+            END) AS AvgCostPrice,
+        MAX(CASE 
+				--GrossProfit = ((COALESCE(AvgSellingPrice, 0) - COALESCE(AvgCostPrice, 0)) * (Quantity * ReduceQuantity))
+				--Revenue = (AvgSellingPrice * (Quantity * ReduceQuantity))
+				--NetProfit = GrossProfit − Expenses
+				--Margin = (NetProfit / Revenue) x 100
+                WHEN tb.MarketplaceSKU = sd.MarketplaceSKU AND tb.SalesChannel = sd.SalesChannel 
+                THEN (((COALESCE(sd.AvgSellingPrice, 0) - COALESCE(sd.AvgCostPrice, 0)) * (sd.Quantity * tb.ReduceQuantity)) - sd.Expenses) / (sd.AvgSellingPrice * (sd.Quantity * tb.ReduceQuantity)) * 100
+                ELSE (((COALESCE(sd.AvgSellingPrice, 0) - COALESCE(sd.AvgCostPrice, 0)) * sd.Quantity) - sd.Expenses) / (sd.AvgSellingPrice * sd.Quantity) * 100
+            END) AS Margin,
+		-- Old Margin
+        CASE 
+            WHEN SUM(sd.Revenue) = 0 THEN 0
+            ELSE (SUM(sd.GrossProfit) / SUM(sd.Revenue)) * 100
+        END AS OldMargin,
+        sd.Image,
+        sd.Title,
+        sd.GTIN,
+        sd.Brand
+    FROM 
+        SalesData sd
+    LEFT JOIN (
+        SELECT 
+            idMasterSKU, 
+            SalesChannel, 
+            MarketplaceSKU, 
+            ReduceQuantity
+        FROM 
+            tblBundle
+    ) tb ON sd.idMasterSKU = tb.idMasterSKU AND sd.SalesChannel = tb.SalesChannel
+    WHERE 
+        sd.rn = 1
+    GROUP BY 
+        sd.SKU, sd.Image, sd.Title, sd.GTIN, sd.Brand, sd.MarketplaceSKU, sd.SalesChannel, 
+        tb.MarketplaceSKU, tb.SalesChannel, tb.ReduceQuantity
+    ORDER BY 
+        TotalSalesQuantity DESC;
+
+END

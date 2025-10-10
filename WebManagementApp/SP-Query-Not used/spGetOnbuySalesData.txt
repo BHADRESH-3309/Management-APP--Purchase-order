@@ -1,0 +1,45 @@
+﻿SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Vaibhavi
+-- Create date: 12-August-2024
+-- Description:	Get OnBuy Sales data
+-- =============================================
+CREATE PROCEDURE [dbo].[spGetOnbuySalesData]
+	@StartDate DATE = NULL,
+    @EndDate DATE = NULL
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+	 WITH CTE_Sales  AS (
+		SELECT s.idSales,s.MarketplaceSKU,s.TrackingNo,s.LabelPath,i.Title,s.BoostFee,s.OrderDate,
+		s.SalesFee,s.OrderId,s.IsEvriShipping, s.IsQuantityProcess,s.DateAdd,s.Quantity,s.StockLocation,s.FulfillmentChannel,MSKU.idMasterSKU,
+		wd._30DaysUnitSales AS Day30,wd._60DaysUnitSales AS Day60,wd._90DaysUnitSales AS Day90, s.SalesChannel,
+		ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.DateAdd DESC) AS rn
+		FROM tblSales s 
+		JOIN tblOnbuyInventory i ON s.MarketplaceSKU = i.SKU
+		JOIN tblMappingSKU MSKU ON s.MarketplaceSKU = MSKU.SKU AND s.SalesChannel = MSKU.SalesChannel
+		LEFT JOIN (SELECT s.MarketplaceSKU,
+			COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -30, CONVERT(datetime, GETDATE())) THEN 
+			s.Quantity ELSE 0 END), 0) AS _30DaysUnitSales,
+			COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -60, CONVERT(datetime, GETDATE())) THEN 
+			s.Quantity ELSE 0 END),0) AS _60DaysUnitSales,
+			COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -90, CONVERT(datetime, GETDATE())) THEN 
+			s.Quantity ELSE 0 END),0) AS _90DaysUnitSales
+			FROM tblSales s GROUP BY s.MarketplaceSKU) wd 
+			ON s.MarketplaceSKU = wd.MarketplaceSKU
+	)
+	SELECT * FROM CTE_Sales WHERE SalesChannel = 'OnBuy' 
+	AND ((@StartDate IS NULL AND @EndDate IS NULL) OR (CONVERT(date, OrderDate) BETWEEN @StartDate AND @EndDate)) 
+	AND  rn = 1 
+	ORDER BY CTE_Sales.OrderDate DESC
+
+END
+GO

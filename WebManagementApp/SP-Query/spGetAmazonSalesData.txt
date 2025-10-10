@@ -1,0 +1,55 @@
+﻿USE [YOUR_DATABASE]
+GO
+/****** Object:  StoredProcedure [dbo].[spGetAmazonSalesData]    Script Date: 08-10-2024 17:47:33 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:        Vaibhavi
+-- Create date:   12-August-2024
+-- Description:   Get Amazon Sales data
+-- =============================================
+CREATE PROCEDURE [dbo].[spGetAmazonSalesData] 
+    @StartDate DATE = NULL,
+    @EndDate DATE = NULL,
+    @CompanyName NVARCHAR (100) = NULL
+AS
+BEGIN
+    -- SET NOCOUNT ON added to prevent extra result sets from
+    -- interfering with SELECT statements.
+    SET NOCOUNT ON;
+
+    WITH CTE_Sales  AS (
+    SELECT s.idSales, s.MarketplaceSKU, s.TrackingNo, s.LabelPath, i.Title, s.OrderId, s.DateAdd,
+    s.Quantity, s.Price, s.StockLocation, i.FulfillmentBy, s.ItemStatus,s.CompanyName,s.Source,
+        -- Set columns to NULL when FulfillmentChannel is 'fulfillment-inbound'
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE (s.ReferralFee * s.Quantity) END AS ReferralFee,
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE (s.VariableClosingFee * s.Quantity) END AS VariableClosingFee,
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE (s.FBAFees * s.Quantity) END AS FBAFees,
+        s.IsEvriShipping, s.IsQuantityProcess, s.FulfillmentChannel, MSKU.idMasterSKU,
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE wd._30DaysUnitSales END AS Day30,
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE wd._60DaysUnitSales END AS Day60,
+        CASE WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN NULL ELSE wd._90DaysUnitSales END AS Day90,
+        CAST(s.OrderDate AS DATE) AS OrderDate,
+		s.SalesChannel, ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.DateAdd DESC) AS rn
+    FROM tblSales s
+    JOIN tblAmazonInventory i ON s.MarketplaceSKU = i.SKU
+    JOIN tblMappingSKU MSKU ON s.MarketplaceSKU = MSKU.SKU AND s.SalesChannel = MSKU.SalesChannel
+    LEFT JOIN (
+        SELECT 
+            s.MarketplaceSKU,
+            COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -30, CONVERT(datetime, GETDATE())) THEN s.Quantity ELSE 0 END), 0) AS _30DaysUnitSales,
+            COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -60, CONVERT(datetime, GETDATE())) THEN s.Quantity ELSE 0 END), 0) AS _60DaysUnitSales,
+            COALESCE(SUM(CASE WHEN s.DateAdd >= DATEADD(DAY, -90, CONVERT(datetime, GETDATE())) THEN s.Quantity ELSE 0 END), 0) AS _90DaysUnitSales
+        FROM tblSales s 
+        GROUP BY s.MarketplaceSKU
+    ) wd ON s.MarketplaceSKU = wd.MarketplaceSKU
+    )
+    SELECT * FROM CTE_Sales WHERE SalesChannel = 'Amazon' AND CompanyName=@CompanyName
+	AND ((@StartDate IS NULL AND @EndDate IS NULL) OR (OrderDate BETWEEN @StartDate AND @EndDate)) 
+	AND  rn = 1 
+	ORDER BY CTE_Sales.OrderDate DESC
+
+END

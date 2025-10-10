@@ -1,0 +1,234 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Stock Receipt Report";
+}
+
+@{
+    var showPOBaseUrl = Url.Action("PurchaseOrder", "PurchaseOrder");
+}
+
+@section Styles
+{
+    <style>
+
+        .title {
+            max-width: 350px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        @@media screen and (max-width: 750px) {
+            .table-overlay {
+                width: 700px !important;
+            }
+        }
+
+        @@media screen and (max-width: 1330px) and (min-width: 750px) {
+            .table-overlay {
+                width: 1500px !important;
+            }
+        }
+
+        @@media screen and (max-width: 700px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+    </style>
+}
+
+<div class="card positionrow">
+    <div class="card-body mt-2">
+        <!-- Table with stripped rows -->
+        <table id="stockReceiptReport-table" class="table">
+        </table>
+
+        <div id="table-loading-spinner" class="table-overlay">
+            <div class="spinner-border" role="status">
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script type="module">
+        var showPOBaseUrl = '@showPOBaseUrl';
+
+        $(document).ready(function () {
+            // Functions to get Stock Rceipt report data.
+            GenerateStockRceiptData();
+        })
+
+        import { DataTable } from "../assets/vendor/simple-datatables/module.js"
+        let _StockRceiptDatatable = null;
+        let _StockRceiptData = [];
+        
+        /**
+        * Fetches the Stock Rceipt report data from the server.
+        */
+        function GenerateStockRceiptData() {
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetStockReceiptReportData", "PurchaseOrder")",
+                dataType: "json",
+                success: function (response) {
+                    if (response.isError) {
+                        GenerateStockReceiptTable(response);
+                        toastr.error(response.message);
+                    } else {
+                        GenerateStockReceiptTable(response);
+                    }
+
+                    $('#table-loading-spinner').addClass('d-none');
+                },
+                failure: handleAjaxError,
+                error: handleAjaxError
+            });
+        }
+
+        /**
+        * Handles AJAX errors by logging the response text
+        * @@param {Array} result - The AJAX result array
+        */
+        function handleAjaxError(result) {
+            $('#table-loading-spinner').addClass('d-none');
+            console.error(result.responseText);
+        }
+
+        /**
+        * Generates the DataTable for Stock Rceipt report data.
+        * * @@param {Array} data - The stock data
+        */
+        function GenerateStockReceiptTable(response) {
+            if (_StockRceiptDatatable) {
+                _StockRceiptDatatable.destroy();
+            }
+
+            _StockRceiptData = response.result.map((row, index) => [
+                index + 1,
+                `<p><a href="${showPOBaseUrl}?po=${row.poNumber}" title="Click to Show Purchase Order Details" target="_blank">${row.poNumber}</a></p>`,               
+                row.quantity,
+                row.damageCount,
+                row.missingCount,
+                row.receivedDate ? formatDate(row.receivedDate) : ''
+            ]);
+
+            let header = ["#", "PO Number", "Received Quantity", "Damage Count", "Missing Count", "Received Date"]
+
+            _StockRceiptDatatable = new DataTable("#stockReceiptReport-table", {
+                data: {
+                    headings: header,
+                    data: _StockRceiptData
+                },
+                perPage: 20,  // Set the default number of records per page
+                perPageSelect: [20, 40, 60],
+            });
+
+            var searchDiv = document.querySelector(".datatable-search");
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+
+                let excelData = [];
+                if (_StockRceiptDatatable.totalPages > 0) {
+                    excelData = _StockRceiptDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells.map(cell => cell.text)
+                        )
+                    ).flat();
+                }
+
+                // Export to Excel functionality
+                const combinedArray = [header, ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [2, 3, 4, 5]; // Columns that need to be numbers
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Stock Receipt Report.xlsx');
+            };
+            searchDiv.appendChild(button);
+
+            $(document).on('mouseenter', '.title', function () {
+                const $this = $(this);
+                if ($this.width() < $this[0].scrollWidth) {
+                    $this.css('white-space', 'normal');
+                }
+            });
+            $(document).on('mouseleave', '.title', function () {
+                const $this = $(this);
+                $this.css('white-space', 'nowrap');
+            });
+        }
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+
+        // Formatting function
+        function formatDate(dateString) {
+
+            if (!dateString) {
+                return '';
+            }
+            const date = new Date(dateString);
+
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-based
+            const year = date.getFullYear();
+
+            return `${day}-${month}-${year}`;
+
+            // Combine formatted date and time
+            return `${formattedDate} ${formattedTime}`;
+        }
+    </script>
+}

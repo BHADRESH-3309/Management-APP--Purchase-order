@@ -1,0 +1,45 @@
+﻿CREATE PROCEDURE spGetNonPerformingSKUsData
+AS
+BEGIN
+
+    -- Author: Dharmil Patel
+	WITH SalesData AS (
+	SELECT s.idSales, m.SKU, s.OrderDate, s.Quantity, m.Image, m.Title, sl.AvgCostPrice, m.GTIN, b.Brand, m.idMasterSKU, map.SalesChannel, s.MarketplaceSKU,
+	ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+	FROM tblSales s
+	JOIN tblMappingSKU map ON s.MarketplaceSKU = map.SKU
+	JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU
+	LEFT JOIN tblBrand b ON m.idBrand = b.idBrand
+	LEFT JOIN (
+				SELECT idMasterSKU, AvgCostPrice
+				FROM (
+					SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+							ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+					FROM tblStockLocation
+				) sl
+				WHERE row_num = 1 -- Selects the latest record based on ModifyTime
+			) sl ON m.idMasterSKU = sl.idMasterSKU
+	)
+	SELECT TOP 5 SKU, Image, Title, GTIN, Brand,
+	MAX(
+		  CASE 
+			WHEN tb.MarketplaceSKU = SalesData.MarketplaceSKU AND tb.SalesChannel = SalesData.SalesChannel 
+			THEN SalesData.Quantity * tb.ReduceQuantity 
+			ELSE SalesData.Quantity
+		  END
+	) AS TotalSalesQuantity,
+	MAX(CASE 
+		WHEN tb.MarketplaceSKU = SalesData.MarketplaceSKU AND tb.SalesChannel = SalesData.SalesChannel 
+		THEN SalesData.AvgCostPrice * tb.ReduceQuantity 
+		ELSE SalesData.AvgCostPrice 
+		END
+	) AS AvgCostPrice
+	FROM SalesData
+	 LEFT JOIN (
+      SELECT idMasterSKU, SalesChannel, MarketplaceSKU, ReduceQuantity 
+      FROM tblBundle
+    ) AS tb ON SalesData.idMasterSKU = tb.idMasterSKU AND SalesData.SalesChannel = tb.SalesChannel 
+	WHERE rn = 1 GROUP BY SKU, Image, Title, AvgCostPrice, GTIN, Brand ORDER BY TotalSalesQuantity ASC;
+
+END
+GO

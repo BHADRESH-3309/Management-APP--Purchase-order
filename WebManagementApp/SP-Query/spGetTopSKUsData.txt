@@ -1,0 +1,89 @@
+﻿CREATE PROCEDURE spGetTopSKUsData
+    @StartDate DATE = NULL,
+    @EndDate DATE = NULL,
+	@CompanyName NVARCHAR(100),
+	@SalesChannel NVARCHAR(50)
+AS
+BEGIN
+    -- Author: Dharmil Patel
+
+    WITH SalesData AS (
+    SELECT s.idSales, m.SKU, s.OrderDate, s.Quantity, m.Image, m.Title, s.Quantity as SalesQty,
+    s.Price As SalesPrice,sl.AvgCostPrice as AvgPriceCost,map.Quantity as MappedQty, s.SalesChannel, s.CompanyName, s.Source, 
+		(COALESCE(sl.AvgCostPrice, 0) *  map.Quantity) AS AvgCostPrice,
+		((COALESCE(sl.AvgCostPrice, 0) *  map.Quantity) * s.Quantity) AS COGS,
+        ((COALESCE(s.Price , 0) / 1.2) * s.Quantity) AS Revenue,
+		(((COALESCE(s.Price , 0) / 1.2) - (COALESCE(sl.AvgCostPrice, 0) *  map.Quantity)) * s.Quantity) AS GrossProfit,
+		m.GTIN, b.Brand,
+        			CASE 
+           WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'amazon' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) THEN 
+                ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)
+            WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'merchant' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) THEN 
+                ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)
+            WHEN s.SalesChannel = 'eBay' THEN 
+                ISNULL(s.ListingFee, 0) + ISNULL(s.FinalValueFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.AdvertisingFee, 0) + ISNULL(s.ShippingFee, 0)
+            WHEN s.SalesChannel = 'OnBuy' THEN 
+                ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)
+            WHEN s.SalesChannel = 'Shopify' THEN 
+                ISNULL(s.ShippingFee, 0)
+            ELSE 0
+        END AS Fees,
+		CASE 
+           WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'amazon' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) THEN 
+                (ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)) * s.Quantity
+            WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'merchant' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) THEN 
+                (ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)) * s.Quantity
+            WHEN s.SalesChannel = 'eBay' THEN 
+                (ISNULL(s.ListingFee, 0) + ISNULL(s.FinalValueFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.AdvertisingFee, 0) + ISNULL(s.ShippingFee, 0)) * s.Quantity
+            WHEN s.SalesChannel = 'OnBuy' THEN 
+                (ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)) * s.Quantity
+            WHEN s.SalesChannel = 'Shopify' THEN 
+                (ISNULL(s.ShippingFee, 0)) * s.Quantity
+            ELSE 0
+        END AS Expenses,
+        ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+    FROM tblSales s
+	JOIN FN_GetTblMappingSKUWithBundleQuantity() map ON s.MarketplaceSKU = map.SKU AND LOWER(s.SalesChannel) = LOWER(map.SalesChannel) 
+			AND LOWER(map.CompanyName) = LOWER(s.CompanyName)
+			--AND (LOWER(map.SalesChannel) != 'amazon' OR LOWER(map.CompanyName) = LOWER(s.CompanyName))
+    JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU
+	LEFT JOIN tblBrand b ON m.idBrand = b.idBrand
+	LEFT JOIN (
+			SELECT sl.idMasterSKU, slh.AvgCostPrice
+            FROM tblStockLocation sl
+            INNER JOIN (
+                -- Get the latest AvgCostPrice from StockLocationHistory on or before the @EndDate
+                SELECT idStockLocation, AvgCostPrice, DateAdd,
+                       ROW_NUMBER() OVER (PARTITION BY idStockLocation ORDER BY DateAdd DESC) AS row_num
+                FROM tblStockLocationHistory
+                WHERE CONVERT(date, DateAdd) <= @EndDate -- Ensure the date is on or before the given EndDate
+            ) slh ON sl.idStockLocation = slh.idStockLocation
+            WHERE slh.row_num = 1
+		) sl ON m.idMasterSKU = sl.idMasterSKU 
+	WHERE (CONVERT(date, OrderDate) BETWEEN @StartDate AND  @EndDate)
+	AND (s.ItemStatus IS NULL OR LOWER(s.ItemStatus) IN ('', 'shipped', 'unshipped'))
+	AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
+	AND (LOWER(@SalesChannel) = 'all' OR LOWER(s.SalesChannel) = LOWER(@SalesChannel))
+	AND (LOWER(s.SalesChannel) != 'amazon' OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 
+	)
+	SELECT MAX(SKU) AS SKU, SUM(Quantity) AS TotalSalesQuantity, 
+	CASE 
+		--Net Profit = Gross Profit − Expenses
+		--Margin = (Net Profit / Revenue) x 100
+        WHEN SUM(Revenue) = 0 THEN 0  -- Handle zero revenue scenario
+        ELSE ((ROUND(SUM(GrossProfit), 2) - ROUND(SUM(Expenses), 2)) / ROUND(SUM(Revenue), 2)) * 100 
+    END AS Margin,
+	MAX(Image) AS Image, MAX(Title) AS Title, MAX(AvgCostPrice) AS AvgCostPrice, MAX(GTIN) AS GTIN, MAX(Brand) AS Brand,
+    SUM(Quantity) As SalesQty ,(SUM(Revenue) * 1.2) / SUM(SalesQty) AS SalesPrice,
+	NULLIF(MAX(MappedQty), 0) as MappedQty, SUM(Expenses) / NULLIF(SUM(SalesQty), 0) AS Fees, 
+	(SUM(AvgCostPrice * Quantity) / NULLIF(SUM(Quantity), 0)) / MAX(MappedQty) AS WeightedAvgPriceCost,
+	SUM(GrossProfit) as GrossProfit, SUM(Expenses) as Expenses, SUM(Revenue) as Revenue,
+	MAX(SalesChannel) AS SalesChannel, MAX(CompanyName) AS CompanyName, MAX(Source) AS Source
+
+	FROM SalesData
+	WHERE rn = 1 
+	GROUP BY SKU 
+    ORDER BY TotalSalesQuantity DESC;
+
+
+END

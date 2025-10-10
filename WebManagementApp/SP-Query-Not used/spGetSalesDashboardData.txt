@@ -1,0 +1,89 @@
+﻿CREATE PROCEDURE spGetSalesDashboardData
+AS
+BEGIN
+    -- Author: Dharmil Patel
+
+    WITH SalesData AS (
+		SELECT s.idSales,
+				CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN s.Quantity * tb.ReduceQuantity 
+					ELSE s.Quantity
+				END
+				AS Quantity,
+			   CAST(s.OrderDate AS DATE) AS AdjustedOrderDate,
+			   CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN COALESCE(sl.AvgCostPrice, 0) * (tb.ReduceQuantity * s.Quantity)
+					ELSE COALESCE(sl.AvgCostPrice, 0) * s.Quantity
+				END AS COGS,
+			    CASE 
+					WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'amazon' THEN ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)
+					WHEN s.SalesChannel = 'Amazon' AND s.FulfillmentChannel = 'merchant' THEN ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'eBay' THEN ISNULL(s.ListingFee, 0) + ISNULL(s.FinalValueFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.AdvertisingFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'OnBuy' THEN ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)
+					WHEN s.SalesChannel = 'Shopify' THEN ISNULL(s.ShippingFee, 0)
+					ELSE 0
+				END AS Expenses,
+				asp.AvgSellingPrice * s.Quantity AS Revenue,
+			    CASE 
+					WHEN tb.MarketplaceSKU = s.MarketplaceSKU AND tb.SalesChannel = s.SalesChannel 
+					THEN ((COALESCE(asp.AvgSellingPrice, 0) - COALESCE(sl.AvgCostPrice, 0)) * (tb.ReduceQuantity * s.Quantity))
+					ELSE (COALESCE(asp.AvgSellingPrice, 0) - COALESCE(sl.AvgCostPrice, 0)) * s.Quantity
+				END AS GrossProfit,
+			   ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+		FROM tblSales s
+		JOIN tblMappingSKU map ON s.MarketplaceSKU = map.SKU
+		JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU AND s.SalesChannel = map.SalesChannel
+		JOIN fnGetInventoryAvgSellingPrice() asp ON asp.idMasterSKU = m.idMasterSKU
+		LEFT JOIN (
+			SELECT idMasterSKU, SalesChannel, MarketplaceSKU, ReduceQuantity 
+			FROM tblBundle
+		) AS tb ON m.idMasterSKU = tb.idMasterSKU AND s.SalesChannel = tb.SalesChannel 
+		LEFT JOIN (
+			SELECT idMasterSKU, AvgCostPrice
+			FROM (
+				SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+					   ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+				FROM tblStockLocation
+			) sl
+			WHERE row_num = 1 -- Selects the latest record based on ModifyTime
+		) sl ON m.idMasterSKU = sl.idMasterSKU where FulfillmentChannel IS NULL OR FulfillmentChannel IN ('merchant', 'amazon')
+	)
+    SELECT
+        -- Data for Today
+		SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN GrossProfit ELSE 0 END) AS TotalGrossProfitToday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN COGS ELSE 0 END) AS TotalCOGSToday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN Expenses ELSE 0 END) AS TotalExpensesToday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN Revenue ELSE 0 END) AS TotalRevenueToday,
+        COUNT(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN AdjustedOrderDate ELSE NULL END) AS SalesToday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() AS DATE) THEN Quantity ELSE 0 END) AS UnitsSoldToday,
+
+        -- Data for Yesterday
+		SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN GrossProfit ELSE 0 END) AS TotalGrossProfitYesterday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN COGS ELSE 0 END) AS TotalCOGSYesterday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN Expenses ELSE 0 END) AS TotalExpensesYesterday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN Revenue ELSE 0 END) AS TotalRevenueYesterday,
+        COUNT(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN AdjustedOrderDate ELSE NULL END) AS SalesYesterday,
+        SUM(CASE WHEN AdjustedOrderDate = CAST(GETDATE() - 1 AS DATE) THEN Quantity ELSE 0 END) AS UnitsSoldYesterday,
+
+        -- Data for Last 7 Days
+		SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN GrossProfit ELSE 0 END) AS TotalGrossProfitLast7Days,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN COGS ELSE 0 END) AS TotalCOGSLast7Days,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN Expenses ELSE 0 END) AS TotalExpensesLast7Days,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN Revenue ELSE 0 END) AS TotalRevenueLast7Days,
+        COUNT(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN AdjustedOrderDate ELSE NULL END) AS SalesLast7Days,
+		SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, -7, CAST(GETDATE() AS DATE)) AND AdjustedOrderDate < CAST(GETDATE() AS DATE) THEN Quantity ELSE NULL END) AS UnitsSoldLast7Days,
+
+        -- Data for Current Month
+		SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN GrossProfit ELSE 0 END) AS TotalGrossProfitMonth,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN COGS ELSE 0 END) AS TotalCOGSMonth,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN Expenses ELSE 0 END) AS TotalExpensesMonth,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN Revenue ELSE 0 END) AS TotalRevenueMonth,
+        COUNT(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN AdjustedOrderDate ELSE NULL END) AS SalesMonth,
+        SUM(CASE WHEN AdjustedOrderDate >= DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)) THEN Quantity ELSE 0 END) AS UnitsSoldMonth
+    FROM SalesData
+    WHERE rn = 1;
+
+END
+GO

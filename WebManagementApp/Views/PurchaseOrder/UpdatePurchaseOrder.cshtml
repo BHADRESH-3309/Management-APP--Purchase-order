@@ -1,0 +1,272 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Update Purchase Order";
+}
+
+@if (ViewData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles
+{
+    <style>
+        #labelPO {
+            font-weight: 600;
+        }
+
+        @@media screen and (max-width: 550px) {
+            .div_top {
+                margin-top: 15px !important;
+            }
+        }
+    </style>
+}
+
+<div class="card">
+    <form asp-controller="PurchaseOrder" asp-action="UpdatePurchaseOrder" class="needs-validation" method="post" id="updatepurchaseOrderForm" enctype="multipart/form-data" novalidate>
+        @Html.HiddenFor(m => m.idPurchaseOrder)
+        @Html.HiddenFor(m => m.idPurchaseOrderProduct)
+        @Html.HiddenFor(m => m.MasterSKU)
+        @Html.HiddenFor(m => m.Quantity, new { id = "productTotalQty" })
+        @Html.HiddenFor(m => m.ReceivedCount, new { id = "receivedTotalQty" })
+        <div class="card-body">
+            <div class="row mt-4 d-flex">
+                <div class="col-md-6">
+                    <h6>
+                        <b>PO Number:</b>
+                        <label asp-for="PONumber" class="form-label">@Model.PONumber</label>
+                </div>
+
+                <div class="col-md-6">
+                    <h6>
+                        <b>Master SKU:</b>
+                        <label asp-for="MasterSKU" class="form-label" id="masterSKU">@Model.MasterSKU</label>
+                </div>
+            </div>
+
+            <div class="row d-flex">
+                <div class="col-md-6">
+                    <h6>
+                        <b>Supplier Name:</b>
+                        <label asp-for="SupplierName" class="form-label">@Model.SupplierName</label>
+                </div>
+
+                <div class="col-md-6">
+                    <h6>
+                        <b>Total Items:</b>
+                        <label asp-for="Quantity" class="form-label">@Model.Quantity</label>
+                </div>
+            </div>
+
+            <div class="row d-flex">
+                <div class="col-md-12">
+                    <h6>
+                        <b>Item Name:</b>
+                        <label asp-for="ItemName" class="form-label">@Model.ItemName</label>
+                </div>
+            </div>
+
+            <div class="row d-flex mb-3">
+                <div class="col-md-6" id="poNumberContainer">
+                    <label asp-for="Status" class="form-label" id="labelPO"></label>
+                    <select asp-for="Status" class="form-select" id="idStatus">
+                        <option selected value="Select">Select</option>
+                        <option value="Created">Created</option>
+                        <option value="Submitted">Submitted</option>
+                        <option value="Partial Received">Partial Received</option>
+                        <option value="Fully Received">Fully Received</option>
+                        <option value="Damage Received">Damage Received</option>
+                        <option value="Overdue as per Expected delivery date">Overdue as per Expected delivery date</option>
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger" id="statusError"></span>
+                </div>
+
+                <div class="col-md-6" id="receivedDateContainer">
+                    <label asp-for="ReceivedDate" class="form-label" id="labelPO"></label>
+                    <input asp-for="ReceivedDate" type="date" class="form-control" id="receivedDateInput" />
+                    <span asp-validation-for="ReceivedDate" class="text-danger" id="receivedDateError"></span>
+                </div>                
+            </div>
+
+            <div class="row d-flex mb-3">
+                <div class="col-md-6 div_top">
+                    <label asp-for="DamageCount" class="form-label" id="labelPO">Damage Count (@Model.DamageCount) :</label>
+                    <input asp-for="DamageCount" type="number" min="0" value="0" class="form-control" id="inputDamageCount" required />
+                </div>
+
+                <div class="col-md-6 div_top">
+                    <label asp-for="MissingCount" class="form-label" id="labelPO">Missing Count (@Model.MissingCount) :</label>
+                    <input asp-for="MissingCount" type="number" min="0" value="0" class="form-control" id="inputMissingCount" required />
+                </div>              
+            </div>
+
+            <div class="row d-flex">
+                <div class="col-md-12">
+                    <label asp-for="IssueDescription" class="form-label" id="labelPO"></label>
+                    <textarea asp-for="IssueDescription" class="form-control" placeholder="Enter Issue Description"></textarea>
+                </div>
+            </div>
+            <hr />
+
+            <div class="mt-4">
+                <h4 class="fw-bold pb-2">Add Delievered Stock</h4>
+            </div>
+
+            <div class="row d-flex">
+                <div class="col-md-6 div_top">
+                    <label asp-for="AmershamQty" class="form-label" id="labelPO"></label>
+                    <input asp-for="AmershamQty" type="number" min="0" value="0" class="form-control" id="inputAmershamAddQuantity"  required />
+                </div>
+
+                <div class="col-md-6 div_top">
+                    <label asp-for="WatfordQty" class="form-label" id="labelPO"></label>
+                    <input asp-for="WatfordQty" type="number" min="0" value="0" class="form-control" id="inputWatfordAddQuantity" required />
+                </div>
+            </div>
+            <hr />
+
+            <button type="submit" class="btn btn-primary" name="submitBtn">Update PO</button>
+
+        </div>
+    </form>
+</div>
+
+
+@section Scripts {
+    <script>
+
+        const form = document.getElementById('updatepurchaseOrderForm');
+        const idStatus = document.getElementById('idStatus');
+        const receivedDateInput = document.getElementById('receivedDateInput');
+        const masterSKU = document.getElementById("masterSKU").innerText;
+
+        $(document).ready(function () {
+            // Run once on page load
+            handleStatusChange();
+        });
+
+        // Form Submit button click event
+        form.addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent default submit
+
+            // Validate status
+            if (idStatus.value === 'Select') {
+                document.getElementById('statusError').textContent = 'Status is required';
+                return;
+            }
+
+            // Validate received date if status is 'Received'
+            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && !receivedDateInput.value) {
+                document.getElementById('receivedDateError').textContent = 'Received Date is required when status is Received.';
+                receivedDateInput.focus();
+                return;
+            }
+
+            const inputAmershamAddQuantity = parseInt(document.getElementById("inputAmershamAddQuantity").value.trim()) || 0;
+            const inputWatfordAddQuantity = parseInt(document.getElementById("inputWatfordAddQuantity").value.trim()) || 0;
+
+            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && inputAmershamAddQuantity === 0 && inputWatfordAddQuantity === 0) {
+                toastr.warning('Add delievered stock-Both Amersham and Watford quantities are 0.');
+                return;
+            }
+
+            const productTotalQty = parseInt(document.getElementById("productTotalQty").value) || 0;
+            const receivedTotalQty = parseInt(document.getElementById("receivedTotalQty").value) || 0;
+
+            const damageCount = parseInt(document.getElementById("inputDamageCount").value) || 0;
+            const missingCount = parseInt(document.getElementById("inputMissingCount").value) || 0;
+
+            if (idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') {
+                
+                const deliveredStock = inputAmershamAddQuantity + inputWatfordAddQuantity;
+                const totalCalculated = receivedTotalQty + damageCount + missingCount + deliveredStock;
+
+                if (totalCalculated > productTotalQty) {
+                    toastr.error("Delivered stock cannot be greater than the total quantity (" + productTotalQty + ").");
+                    return;
+                }
+            }
+
+            if (idStatus.value === 'Damage Received') {
+                if (damageCount !== productTotalQty) {
+                    toastr.error("For 'Damage Received', Damage Count must equal the total quantity (" + productTotalQty + ").");
+                    return;
+                }
+            }
+
+            // Trigger client-side validation
+            if (!$("#updatepurchaseOrderForm").valid()) {
+                return;
+            }
+
+            form.submit();
+        });
+
+        function handleStatusChange() {
+            const status = idStatus.value;
+            const receivedDateError = document.getElementById('receivedDateError');
+            const inputDamage = document.getElementById("inputDamageCount");
+            const inputMissing = document.getElementById("inputMissingCount");
+            const inputAmersham = document.getElementById("inputAmershamAddQuantity");
+            const inputWatford = document.getElementById("inputWatfordAddQuantity");
+
+            if (status !== "Select") {
+                document.getElementById('statusError').textContent = '';
+            }
+
+            if (status === 'Fully Received' || status === 'Partial Received') {
+                if (receivedDateInput.value) {
+                    receivedDateError.textContent = '';
+                }
+            } else {
+                receivedDateError.textContent = '';
+            }
+
+            inputDamage.disabled = true;
+            inputMissing.disabled = true;
+            inputAmersham.disabled = true;
+            inputWatford.disabled = true;
+
+            inputDamage.value = 0;
+            inputMissing.value = 0;
+            inputAmersham.value = 0;
+            inputWatford.value = 0;
+
+            if (status === "Fully Received" || status === "Partial Received") 
+            {
+                inputDamage.disabled = false;
+                inputMissing.disabled = false;
+                inputAmersham.disabled = false;
+                inputWatford.disabled = false;
+            }
+            else if (status === "Damage Received") 
+            {
+                inputDamage.disabled = false;  
+            }
+        }
+
+        idStatus.addEventListener("change", handleStatusChange);
+
+        function isInputValid(inputValue) {
+            if (inputValue !== null && inputValue !== "") {
+                return true; // Input is not null or empty
+            } else {
+                return false; // Input is null or empty
+            }
+        }
+
+    </script>
+}

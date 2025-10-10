@@ -1,0 +1,1091 @@
+﻿@model WebManagementApp.Models.MasterSKUVM
+﻿@{
+    ViewData["Title"] = ViewBag.Title;
+}
+
+@if (ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewBag.SuccessMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @ViewBag.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@section Styles {
+    <style>
+        #brand_table th:nth-child(2),
+        #brand_table td:nth-child(2) {
+            width: 35% !important;
+        }
+
+        @@media screen and (max-width: 400px) {
+            #brandEditButton {
+                margin-bottom: 6px;
+            }
+        }
+       
+        #drop-zone {
+            max-width: 370px;
+            height: 370px;
+            border: 1px ridge #eee;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .dropdownimg {
+            object-fit: contain;
+            width: 100%;
+            height: 100%;
+            display: none;
+        }
+
+
+        @@media only screen and (max-width: 1459px) and (min-width: 1200px) {
+            #productQuantityInput {
+                margin-top: 24px;
+            }
+        }
+
+        @@media only screen and (max-width: 1140px) and (min-width: 991px) {
+            #productQuantityInput {
+                margin-top: 24px;
+            }
+        }
+
+        @@media only screen and (max-width: 778px) and (min-width: 767px) {
+            #productQuantityInput {
+                margin-top: 24px;
+            }
+        }
+
+         #idImageFormat {
+            float: center;
+        }
+      
+        @@media only screen and (max-width:991px ) and (min-width: 560px ) {
+            #idImageFormat {
+               width:350px;
+            }
+        }
+        @@media only screen and (min-width: 1200px) and (max-width: 1372px) {
+            #image-preview-text {
+               margin-left: 10px;
+            }
+        }
+
+        @@media only screen and (min-width: 991px) and (max-width: 1070px) {
+            #image-preview-text {
+               margin-left: 10px;
+            }
+        }
+
+        @@media only screen and (max-width: 392px) {
+            #image-preview-text {
+                margin-left: 10px;
+            }
+        }
+
+        @@media only screen and (min-width: 767px) and (max-width: 912px) {
+            #btobMarginLabel {
+                width: 66%!important;
+            }
+        }
+
+        @@media only screen and (min-width: 912px) and (max-width: 992px) {
+            #btobMarginLabel {
+                width: 55% !important;
+            }
+        }
+
+        @@media only screen and (min-width: 992px) and (max-width: 1200px) {
+            #btobMarginLabel {
+                width: 80% !important;
+            }
+        }
+
+        @@media only screen and (min-width: 1200px) and (max-width: 1440px) {
+            #btobMarginLabel {
+                width: 92% !important;
+            }
+        }
+
+        @@media only screen and (min-width: 1440px) and (max-width: 1590px) {
+            #btobMarginLabel {
+                width: 79% !important;
+            }
+        }
+
+        @@media only screen and (min-width: 1590px) and (max-width: 1679px) {
+            #btobMarginLabel {
+                width: 59% !important;
+            }
+        }
+
+        .select2-container--default .select2-selection--single {
+            height: 35px;
+        }
+        .select2-container {
+            width:100% !important;
+        }
+
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #brand_submit {
+            margin-top: 32px;
+        }
+
+        @@media screen and (max-width: 764px) {
+            #brand_submit {
+                margin-top: 13px;
+            }
+        }
+        
+    </style>
+}
+ @if (Model.idMasterSKU == Guid.Empty)
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="row" style="padding-top:20px">
+                <div class="col-lg-8 mt-2">
+                    <form asp-controller="MasterSKU" asp-action="UploadProductExcel" method="post" enctype="multipart/form-data">
+                        <div class="row">
+                            <label for="inputFile" class="col-sm-3 col-form-label">Upload Products:</label>
+                            <div class="col-sm-6 mb-2">
+                                <input class="form-control custom-file-input" accept=".xlsx,.xls" name="postedExcel" id="FileUpload" type="file" id="formFile" required>
+                            </div>
+                            <div class="col-sm-3 mb-2">
+                                <button type="submit" class="btn btn-primary">Submit File</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-lg-4 mt-2">
+                    <div class="row">
+                        <div class="col-12">
+
+                            <label style="margin-right: 20px;">Product Upload Sample File:</label>
+                            <button class="btn btn-outline-success" id="samplebtn" type="submit">Download</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <form asp-controller="MasterSKU" asp-action="Index" asp-route-sku="@ViewBag.SKU" class="needs-validation" method="post" id="form2" enctype="multipart/form-data" novalidate onsubmit="return confirmSubmit()">
+        <input type="text" id="masterSkuId" asp-for="idMasterSKU" hidden />
+        <input type="text" asp-for="Image" hidden />
+        <div class="card-body">
+            <div class="row mt-3">
+                <div class="col-sm-6 col-md-6 col-lg-4 mt-2 g-3">
+                    <div class="card h-100">
+                        <div class="card-body mt-2">
+                            <div class="col-md-12">
+                                <p class="text-center font-weight-bold mb-0 mt-3" style="font-weight: bold;">Product Information</p>
+                                <hr style="width:100%;text-align:left;margin-left:0;margin-top:0">
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <label asp-for="Title" class="form-label">
+                                        @Html.DisplayNameFor(m => m.Title)
+                                        <span style="color:black">*</span>
+                                    </label>
+                                    
+                                    <textarea type="text" class="form-control" rows="2" asp-for="Title" id="productTitleInput" onkeypress=" return Whitespace(event)" required></textarea>
+                                    <div class="invalid-feedback">
+                                        Please enter the product title.
+                                    </div>
+
+                                </div>
+                                <div class="col-md-12">
+                                    <label asp-for="SKU" class="form-label">
+                                        @Html.DisplayNameFor(m => m.SKU)
+                                        <span style="color:black">*</span>
+                                    </label>
+                                    <input type="text" class="form-control" asp-for="SKU" id="productSKUInput" onkeypress=" return Whitespace(event)" required>
+                                    <div class="invalid-feedback">
+                                        Please enter the sku.
+                                    </div>
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label class="form-label" asp-for="Description"> </label>
+                                    <textarea class="form-control" rows="4" asp-for="Description" placeholder="Enter description here ..."></textarea>
+                                </div>
+                               
+                                <div class="col-md-12">
+                                    <label class="form-label" asp-for="Brand"> </label>
+                                  
+                                    <a id="btnBrand" style="padding-top:2px;margin-bottom: 7px;"
+                                       data-toggle="modal" data-target="#brandModel" href="javascript:void(0);" onclick="openModel()" title="Add New Brand">
+                                        <i class="bi bi-gear custom-icon"></i>
+                                    </a>
+                                   
+                                    @if (Model.brandlist != null && Model.brandlist.Any())
+                                    {
+                                        @Html.DropDownListFor(m => m.idBrand, new SelectList(Model.brandlist, "idBrand", "Brand")
+                                                 , new { onchange = "setBrandName(this)", id = "brandName", @class = "form-control select2" })
+                                    }
+                                    else
+                                    {
+                                        @Html.DropDownList("brandName", new List<SelectListItem> { }, "-- Select --", new { @class = "form-control" })
+                                    }
+
+                                    @Html.HiddenFor(m => m.Brand)
+                                </div>
+                               
+                                <div class="col-md-6">
+                                    <label asp-for="ProductSource" class="form-label"> </label>
+                                    <input type="text" asp-for="ProductSource" class="form-control" id="productSource">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="GTIN" class="form-label"></label>
+                                    <input type="text" class="form-control" asp-for="GTIN" id="productGTINInput">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="EAN" class="form-label"> </label>
+                                    <input type="text" class="form-control" asp-for="EAN" id="productEANInput">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="Barcode" class="form-label"></label>
+                                    <input type="text" class="form-control" asp-for="Barcode" id="productBarcodeInput">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label" asp-for="Note"> </label>
+                                    <textarea class="form-control" rows="2" asp-for="Note" ></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-6 col-lg-4 mt-2 g-3">
+                    <div class="card h-100">
+                        <div class="card-body mt-2">
+                            <div class="col-md-12">
+                                <p class="text-center font-weight-bold mb-0 mt-3" style="font-weight: bold;">Product Dimensions</p>
+                                <hr style="width:100%;text-align:left;margin-left:0;margin-top:0">
+                            </div>
+                            <div class="row g-3">
+                                
+                                <div class="col-md-6">
+                                    <label asp-for="Width" class="form-label"> </label>
+                                    <input type="text" class="form-control" asp-for="Width" id="productWidthInput" onkeypress=" return isNumberAndDecimal(event, this)" oninput="calculateVolumetricWeight()">
+                                </div>
+                                <div class="col-md-6">
+                                    <label asp-for="Length" class="form-label"></label>
+                                    <input type="text" class="form-control" asp-for="Length" id="productDepthInput" onkeypress=" return isNumberAndDecimal(event, this)" oninput="calculateVolumetricWeight()">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="Height" class="form-label"> </label>
+                                    <input type="text" class="form-control" asp-for="Height" id="productHeightInput" onkeypress=" return isNumberAndDecimal(event, this)" oninput="calculateVolumetricWeight()">
+                                </div>
+                                <div class="col-md-6">
+                                    <label asp-for="Weight" class="form-label" id="inputWeight"></label>
+                                    <input type="text" class="form-control" asp-for="Weight" id="productWeightInput" onkeypress=" return isNumberAndDecimal(event, this)">
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="VolumetricWeight" class="form-label"></label>
+                                    <input type="text" class="form-control" asp-for="VolumetricWeight" id="productVolumetricWeightInput" placeholder="Auto Calculated" readonly>
+                                </div>
+                            </div> 
+                            
+                            <div class="col-md-12">
+                                <p class="text-center font-weight-bold mb-0 mt-3" style="font-weight: bold;">Product Margins</p>
+                                <hr style="width:100%;text-align:left;margin-left:0;margin-top:0">
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-md-12">
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" asp-for="IsBtoB" id="isBtoB">
+                                        <label asp-for="IsBtoB" class="form-label"> </label>        
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label asp-for="BtoBMargin" class="form-label" id="btobMarginLabel"> </label>
+                                    <input type="text" class="form-control" asp-for="BtoBMargin" 
+                                        id="productBtoBMarginInput" onkeypress=" return isNumberAndDecimalAndMinus(event, this)">
+                                </div>
+                                <div class="col-md-6">
+                                    <label asp-for="MarketplaceMargin" class="form-label"></label>
+                                    <input type="text" value="5" class="form-control" asp-for="MarketplaceMargin" 
+                                        id="productMarketplaceMarginInput" onkeypress=" return isNumberAndDecimalAndMinus(event, this)">
+                                </div>                            
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-12 col-lg-4 mt-2">
+                    <div class="card h-100 px-4">
+                        <div class="card-body">
+                            <div class="row g-3 mt-2">
+                                <div>
+                                    <p class="text-center font-weight-bold mb-0" style="font-weight: bold;">Product Image</p>
+                                </div>
+                                <hr style="width:100%;text-align:left;margin-left:0;margin-top:0">
+
+                                <div class="col-md-12">
+                                    <div id="drop-zone" style="cursor:pointer">
+                                        @if (@Model.Image != null && Model.Image !="")
+                                        {
+                                            <img id="preview-selected-image" class="dropdownimg" src="/productimages/@Model.Image" alt="Product image" style="display:block">
+                                            <p id="image-preview-text" style="display:none">Drop image or click to upload</p>
+                                        }
+                                        else
+                                        {
+                                            <img id="preview-selected-image" class="dropdownimg" alt="Placeholder image">
+                                            <p id="image-preview-text" style="cursor:pointer">Drop image or click to upload</p>
+                                        }
+                                        <input type="file" id="myfile" name="postedImage" accept="image/*" hidden>
+                                    </div>
+                                    <p class="text-muted mb-0" id="idImageFormat">Image size allows a max of 5MB and JPG/PNG format.</p>
+                                </div>
+                                <div class="col-md-12 py-4">
+                                    @if (Model.idMasterSKU != Guid.Empty)
+                                    {
+                                        @if (@Model.Image != null && Model.Image != "")
+                                        {
+                                            <span class="text-danger" onclick=removeImage() style="cursor:pointer"><i class="bi bi-archive"></i> Delete image</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-danger" style="display:none"><i class="bi bi-archive"></i> Delete image</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-danger" onclick=removeImage() style="display:none"><i class="bi bi-archive"></i> Delete image</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <hr style="width:100%;text-align:left;margin-left:0;margin-top:0">
+            </div>
+            <div class="btn-group mb-3" style="float:right">
+                <div class="add-margin">
+                    <a type="button" class="btn btn-secondary" href="@Url.Action("Index","MasterSKU")">Cancel</a>
+                </div>
+                @if (Model.idMasterSKU != Guid.Empty)
+                {
+                    <div class="add-margin">
+                        <button type="submit" class="btn btn-primary" style="margin-left:20px" id="btnSaveProduct">Update Product</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="add-margin">
+                        <button type="submit" class="btn btn-primary" style="margin-left:20px" id="btnSaveProduct">Save Product</button>
+                    </div>
+                }
+
+                <span id="imagePath" hidden>@Model.Image</span>
+            </div>
+        </div>
+    </form>
+</div><!-- End Card with header and footer -->
+
+<div class="modal fade" id="verticalycentered" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Brands</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <form class="needs-validation modelform" id="form2" novalidate>
+                        <div class="row p-3">
+                            <div class="col-md-6">
+                                <label class="form-label" id="IdNewBrandLabel">Brand: <span style="color:black">*</span></label>
+                                <input type="text" class="form-control" id="brandInput" onkeypress=" return Whitespace(event)" required>
+                                <div class="invalid-feedback">
+                                    Please enter the Brand.
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <button type="submit" class="btn btn-primary" id="brand_submit" >Add</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table" id="brand_table">
+                            
+                        </table>
+                        <div id="mapping-loading-spinner" class="table-overlay" style="display:none">
+                            <div class="spinner-border" role="status">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div><!-- End Vertically centered Modal-->
+
+@section Scripts{
+    <script>
+        // Page load
+        $(document).ready(function () {
+
+            $('#brandName').select2({
+
+            });
+            var message = sessionStorage.getItem('message');
+            var messageType = sessionStorage.getItem('messageType');
+
+            if (message) {
+                if (messageType === 'success') {
+                    //toastr.success(message);
+                    Swal.fire(
+                        'Deleted!',
+                         message,
+                        'success'
+                    );
+                } else if (messageType === 'error') {
+                    //toastr.error(message);
+                    Swal.fire(
+                        'Error!',
+                        message,
+                        'error'
+                    );
+                }
+
+                // Clear the message from storage after displaying
+                sessionStorage.removeItem('message');
+                sessionStorage.removeItem('messageType');
+            }
+        });
+
+        // If product is B2B then default set margin 5%, if not then set blank.
+        document.addEventListener('DOMContentLoaded', function () {
+            const isBtoBCheckbox = document.getElementById('isBtoB');
+            const btoBMarginInput = document.getElementById('productBtoBMarginInput');
+
+            isBtoBCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    btoBMarginInput.value = 5;
+                } else {
+                    btoBMarginInput.value = '';
+                }
+            });
+        });
+
+        function confirmSubmit() {
+          
+            // Get the image path from the hidden input or span element
+            var imagePath = document.getElementById('myfile').value.trim();
+            var inputTitle = document.getElementById('productTitleInput').value.trim();
+            var inputSKU = document.getElementById('productSKUInput').value.trim();
+            let button = document.getElementById('btnSaveProduct').innerText.trim();
+
+            var imgElement = document.getElementById('preview-selected-image');
+            var existingImagePath = imgElement && imgElement.src && !imgElement.src.includes("placeholder");
+
+            let message = "";
+            let confirmMessage = "";
+           
+            if (button == "Save Product") {
+                message = "You want to add the product without an image!"
+                confirmMessage = "Yes, submit it!";
+            }
+            else
+            {
+                message = "You want to update the product without an image!"
+                confirmMessage = "Yes, update it!";
+            }
+            if (inputTitle && inputSKU) {
+
+                // Check if the image path is empty
+                if (!imagePath && !existingImagePath) {
+
+                    Swal.fire({
+                        title: 'Are you sure?',
+                        text: message,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: confirmMessage,
+                        cancelButtonText: 'No, cancel'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            // If confirmed, submit the form
+                            document.getElementById('form2').submit();
+                        }
+                        // If cancelled, do nothing (form will not be submitted)
+                    });
+                    // Return false to prevent the form from submitting immediately
+                    return false;
+                }
+                document.getElementById('form2').submit();
+            }
+            
+            // Proceed with form submission if image path is not empty
+        }     
+
+        // calculate weight 
+        function calculateVolumetricWeight() {
+           
+            const width = parseFloat(document.getElementById('productWidthInput').value) || 0;
+            const depth = parseFloat(document.getElementById('productDepthInput').value) || 0;
+            const height = parseFloat(document.getElementById('productHeightInput').value) || 0;
+
+            const volumetricWeight = (width * depth * height) / 5000;
+
+            document.getElementById('productVolumetricWeightInput').value = volumetricWeight.toFixed(2);
+        }
+
+        //------------ END --------------------------
+
+        // //Number and decimal validation
+
+        function isNumberAndDecimal(evt, element) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            var value = element.value;
+            var dotContains = value.indexOf('.') !== -1;
+            if (dotContains && charCode == 46) {
+                return false;
+            }
+            if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 46) {
+                return false;
+            }
+            return true;
+        }
+        function isNumber(evt, element) {
+            var charCode = (evt.which) ? evt.which : event.keyCode;
+            var inputValue = $(element).val();
+
+            // Allow only digits (0-9) and backspace
+            if ((charCode < 48 || charCode > 57) && charCode !== 8) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function isNumberAndDecimalAndMinus(evt, element) {
+            var charCode = evt.which || evt.keyCode;
+            var value = element.value;
+
+            // Allow one minus sign at the beginning
+            if (charCode === 45 && value.length === 0) return true;
+
+            // Allow only one decimal point
+            if (charCode === 46 && value.indexOf('.') === -1) return true;
+
+            // Allow digits 0-9
+            if (charCode >= 48 && charCode <= 57) return true;
+
+            return false;
+        }
+        // END
+
+        //Remove Image - Start
+
+        function removeImage() {
+            const idMasterSKU = document.getElementById('masterSkuId').value;
+            const imagePath = document.getElementById('imagePath').innerHTML
+
+            if (idMasterSKU && imagePath) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.ajax({
+                            type: "GET",
+                            url: "/MasterSKU/DeleteImage?idMasterSKU=" + idMasterSKU + "&imagename=" + imagePath,
+                            dataType: "json",
+                            success: function (result) {
+
+                                if (result.isError) {
+                                    Swal.fire(
+                                        'Error!',
+                                        result.response,
+                                        'error'
+                                    );
+                                    //toastr.error(result.response);
+                                }
+                                else{
+                                    sessionStorage.setItem('message', result.response);
+                                    sessionStorage.setItem('messageType', 'success');
+                                    //toastr.success(result.response);
+                                    location.reload();
+                                }
+
+                            },
+                            failure: function (response) {
+                                console.error(response.responseText);
+                            },
+                            error: function (response) {
+                                console.error(response.responseText);
+                            }
+                        });
+                        
+                    } else if (result.dismiss === Swal.DismissReason.cancel) {
+                        Swal.fire({
+                            title: 'Cancelled',
+                            text: 'Your image is safe :)',
+                            icon: 'error',
+                            customClass: {
+                                confirmButton: 'btn btn-success waves-effect waves-light'
+                            }
+                        });
+                    }
+                });
+            }
+        }
+        //End
+
+        //get sample file
+        $("#samplebtn").click(function (e) {
+            createAndDownloadExcelFile()
+        });
+
+        function createAndDownloadExcelFile() {
+            // Create a workbook
+            var wb = XLSX.utils.book_new();
+
+            // Create a worksheet
+            var ws = XLSX.utils.aoa_to_sheet([
+                ['Title', 'Master SKU', 'Description', 'Product Source', 'Brand', 'GTIN', 'EAN', 'Barcode', 'Width (CM)', 'Length (CM)', 'Height (CM)', 'Weight (KG)', 'Note'],
+                ['TesingSKU', 'PROD00102', 'My Testing SKU', 'UK', 'Nike', 'xyz', '0123456789', '', '1.2', '4.5', '3.6', '4.5', 'testing sku'],
+                ['APPAREL SKU', 'APPAREL-001', '', '', 'APPAREL', '', '', '', '1.2', '4.5', '3.6', '4.5', ''],
+                ['SONY SKU', 'SONY-PS5', '', 'USA', 'Sony', '', '0123456780', '', '', '4.5', '', '4.7', 'testing'],
+                ['P123 SKU', 'P123-XB', '', '', '', '', '', '', '1.2', '', '3.6', '', ''],
+                ['ELEC SKU', 'ELEC-XYZ789', 'My Testing SKU', 'UK', '', '', '1122456789', '', '', '', '', '', '2.5', '']
+            ]);
+
+
+            // Add the worksheet to the workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+            // Convert workbook to binary data
+            var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+
+            // Convert binary data to a Blob object
+            var blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
+
+            // Create a download link and trigger the download
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'Product_Sample.xlsx';
+            link.click();
+        }
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            var buf = new ArrayBuffer(s.length);
+            var view = new Uint8Array(buf);
+            for (var i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+
+        function Whitespace(event) {
+            var key = event.keyCode || event.which;
+            var inputElement = event.target;
+            var inputValue = inputElement.value;
+            var cursorPosition = inputElement.selectionStart;
+            var inputChar = String.fromCharCode(key);
+
+            // Updated allowed pattern to include single quotes and allow spaces except at the start
+            var pattern = /^[a-zA-Z0-9\'\"\s]*$/;
+
+            // Allow control characters like backspace and delete
+            if (key === 8 || key === 46) {
+                return true;
+            }
+
+            // Handle the space character
+            if (key === 32) {
+                // Prevent leading spaces
+                if (cursorPosition === 0 || /\s/.test(inputValue[cursorPosition - 1])) {
+                    event.preventDefault();
+                    return false;
+                }
+            }
+           
+            // Prevent multiple consecutive spaces
+            if (/(\s\s)/.test(inputChar)) {
+                event.preventDefault();
+                return false;
+            }
+
+            return true;
+        }
+
+
+    </script>
+    <script>
+        const dropZone = document.querySelector('#drop-zone');
+        const inputElement = document.querySelector('#myfile');
+        const img = document.querySelector('#preview-selected-image');
+        let p = document.querySelector('#image-preview-text')
+
+        inputElement.addEventListener('change', function (e) {
+            const clickFile = this.files[0];
+            if (clickFile) {
+                img.style = "display:block;";
+                p.style = 'display: none';
+                const reader = new FileReader();
+                reader.readAsDataURL(clickFile);
+                reader.onloadend = function () {
+                    const result = reader.result;
+                    let src = this.result;
+                    img.src = src;
+                    img.alt = clickFile.name
+                }
+            }
+        })
+        dropZone.addEventListener('click', () => inputElement.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            img.style = "display:block;";
+            let file = e.dataTransfer.files[0];
+            $("#myfile").prop("files", e.dataTransfer.files)
+
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = function () {
+                e.preventDefault()
+                p.style = 'display: none';
+                let src = this.result;
+                img.src = src;
+                img.alt = file.name
+            }
+        });
+
+        //
+        function setBrandName(dropdown) {
+            let brandName = $("#brandName option:selected").text();
+            document.getElementById('Brand').value = brandName;
+        }
+
+        let _brandtableData = null;
+        let dataTable = null;
+        let _brandData = [];
+        let _IsAnyRecordInserted = false;
+        let _IsAnyRecordUpdated = false;
+        let _IsAnyRecordDeleted = false;
+        let selectedBrand = null;
+        let selectedBrandId = null;
+
+        function openModel(){
+            $('#verticalycentered').modal('show');
+            GetBrandList();
+        }
+
+        function GetBrandList() {
+            $('#mapping-loading-spinner').show();
+           
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetBrandList", "MasterSKU")",
+                dataType: "json",
+                success: function (response) {
+                    $('#mapping-loading-spinner').hide();
+                    if (response.error) {
+                        toastr.error(response.message);
+                        
+                    } else{
+                        if (dataTable) {
+                            dataTable.destroy();
+                        }
+                        var data = response.result;
+                        // Convert data to the format required by Simple-DataTables
+                        _brandtableData = data.map(row => [
+                            row.brand,
+                            `<div class="btn-group" role="group" aria-label="Product Actions">
+                                                                                        <button type="button" class="btn btn-primary " id="brandEditButton" data-id="${encodeURIComponent(row.brand)},${row.idBrand}" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Edit Brand" title="Edit Brand">
+                                    <i class="bi bi-pencil-square"></i>
+                                    </button>
+                             </div>
+                             <div class="btn-group" role="group" aria-label="Product Actions">
+                                                       <button type="button" class="btn btn-danger remove-product" id="btnremove" data-id="${encodeURIComponent(row.brand)},${row.idBrand}" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-original-title="Remove Brand" title="Remove Brand">
+                                        <i class="bi bi-trash"></i>
+                                        </button>
+                             </div>`
+                        ]);
+                        if (_IsAnyRecordInserted || _IsAnyRecordUpdated || _IsAnyRecordDeleted) {
+                            
+                            var brandDropdown = $('#brandName');
+                            var currentSelectedValue = brandDropdown.val(); // Preserve current selection
+                            var brandOptions = '<option value="">-- Select --</option>';
+
+                            $.each(data, function (index, item) {
+                                brandOptions += '<option value="' + item.idBrand + '">' + item.brand + '</option>';
+                            });
+
+                            // Update the dropdown
+                            brandDropdown.html(brandOptions);
+
+                            // Restore the previous selection if it exists in the updated list
+                            if (data.some(item => item.idBrand == currentSelectedValue)) {
+                                brandDropdown.val(currentSelectedValue);
+                            } else {
+                                brandDropdown.val(''); // Reset to default if previous selection is not in the list
+                            }
+                        }
+                    }
+                    // * Initiate Datatable for the table with id 'productTable'
+
+                    dataTable = new simpleDatatables.DataTable($('#brand_table')[0], {
+                        data: {
+                            headings: ["Brand", "Action"],
+                            data: _brandtableData
+                        },
+                        perPage: 5,  // Set the default number of records per page
+                        perPageSelect: [5, 10, 15],
+                        columns: [
+                        ]
+                    });
+                    // Event listener for remove product button
+                    $(document).on('click', '#brandEditButton', function () {
+                        // Retrieve the data-id attribute value and split it
+                        var dataId = $(this).data('id').split(',');
+                        var brand = dataId[0];
+                        var id = dataId[1];
+                        brand = decodeURIComponent(brand);
+                        handleBrandEdit(brand, id); // Call function with both values
+                    });
+                    // Event listener for remove product button
+                    $(document).on('click', '#btnremove', function () {
+                        // Retrieve the data-id attribute value and split it
+                        var dataId = $(this).data('id').split(',');
+                        var brand = dataId[0];
+                        var idBrand = dataId[1];
+
+                        handleBrandRemove(brand, idBrand); // Call function with both values
+                    });
+                   
+                },
+                error: function (error) {
+                    $('#mapping-loading-spinner').hide();
+                    toastr.error('Error fetching data: ' + error.responseText);
+                }
+            });
+        }
+        
+        //Update table data when modal is closed and sku is deleted from modal list
+        document.getElementById('verticalycentered').addEventListener('hidden.bs.modal', function () {
+           
+           
+            $('#brandInput').val('');
+            $("#brand_validation").hide();
+            
+            resetModalState();
+        });
+        
+        // Function to reset modal state
+        function resetModalState() {
+            selectedBrand = null;
+            selectedBrandId = null;
+            var label = document.getElementById('IdNewBrandLabel');
+            // label.textContent = 'Brand:';
+            label.innerHTML = 'Brand: <span style="color:black">*</span>';
+            var button = document.getElementById('brand_submit');
+            button.textContent = 'Add'; // Reset button text to default
+        }
+       
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.querySelector('.modelform');
+            const submitButton = document.getElementById('brand_submit');
+
+            submitButton.addEventListener('click', (event) => {
+                event.preventDefault(); // Prevent default button action
+                event.stopPropagation(); // Stop any further propagation
+
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated'); // Add Bootstrap validation classes
+                } else {
+                    addNewBrand(); // Call your custom function if the form is valid
+                    form.classList.remove('was-validated');
+                }
+            });
+
+            // Ensure the modal does not automatically close
+            document.getElementById('verticalycentered').addEventListener('hidden.bs.modal', () => {
+                form.classList.remove('was-validated');
+                form.reset(); // Optionally reset form fields
+            });
+        });
+
+        function addNewBrand(){
+            let brandInput = document.getElementById("brandInput").value.trim()
+            if (!selectedBrandId) {
+                $.ajax({
+                    type: "POST",
+                    url: "@Url.Action("AddBrand", "MasterSKU")",
+                    data: { brand: brandInput },
+                    success: function (response) {
+                        if (response.error) {
+                            toastr.error(response.message);
+                        } else {
+                            toastr.success(response.message);
+                            document.getElementById("brandInput").value = "";
+                            _IsAnyRecordInserted = true;
+                            GetBrandList();
+                        }
+                    },
+                    failure: function (response) {
+                        console.error(response.responseText);
+                    },
+                    error: function (error) {
+                        console.error('Error fetching data:', error);
+                    }
+                });
+            }
+            else
+            {
+                $.ajax({
+                    type: "POST",
+                    url: "@Url.Action("UpdateBrand", "MasterSKU")",
+                    data: { brand: brandInput, idBrand: selectedBrandId },
+                    success: function (response) {
+                        if (response.error) {
+                            toastr.error(response.message);
+                        } else {
+                            toastr.success(response.message);
+                            document.getElementById("brandInput").value = "";
+                            _IsAnyRecordUpdated = true;
+                            GetBrandList();
+                            resetModalState();
+                           
+                        }
+                    },
+                    failure: function (response) {
+                        console.error(response.responseText);
+                    },
+                    error: function (error) {
+                        console.error('Error fetching data:', error);
+                    }
+                });
+            }
+        }
+        
+        function handleBrandEdit(brand,id) {
+            if (brand) {
+                selectedBrand = brand; // Store the selected ID
+                selectedBrandId = id;
+               
+
+                // Set the ID into the modal input field
+                $('#brandInput').val(brand);
+                // Show the modal
+                $('#brandModel').modal('show');
+                // $("#brand_validation").hide();
+                
+                var label = document.getElementById('IdNewBrandLabel');
+                // label.textContent = 'Brand:';
+                label.innerHTML = 'Brand: <span style="color:black">*</span>';
+                var button = document.getElementById('brand_submit');
+
+                // Change the button text
+                button.textContent = 'Update'; // or use button.innerHTML = 'Update';
+            }
+        }
+
+        function handleBrandRemove(brand,idBrand){
+            if (idBrand) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        //
+                        $.ajax({
+                            type: "POST",
+                            url: "@Url.Action("DeleteBrand", "MasterSKU")",
+                            data: { idBrand: idBrand },
+                            success: function (response) {
+                                if (response.error) {
+                                    Swal.fire(
+                                        'Error!',
+                                        response.message,
+                                        'error'
+                                    );
+                                } else {
+                                    Swal.fire(
+                                        'Deleted!',
+                                        response.message,
+                                        'success'
+                                    );
+                                    _IsAnyRecordDeleted = true;
+                                    GetBrandList();
+                                }
+                            },
+                            error: function (error) {
+                                Swal.fire(
+                                    'Error!',
+                                    'Failed to delete record.',
+                                    'error'
+                                );
+                            }
+                        });
+                    } else if (result.dismiss === Swal.DismissReason.cancel) {
+                        Swal.fire({
+                            title: 'Cancelled',
+                            text: 'Your record is safe :)',
+                            icon: 'error',
+                            customClass: {
+                                confirmButton: 'btn btn-success waves-effect waves-light'
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    </script>
+}

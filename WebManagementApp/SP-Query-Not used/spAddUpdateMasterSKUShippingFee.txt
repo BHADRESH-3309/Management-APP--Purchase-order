@@ -1,0 +1,47 @@
+﻿CREATE PROCEDURE spAddUpdateMasterSKUShippingFee
+    @idMasterSKU uniqueidentifier,
+    @ShippingFee float
+AS
+BEGIN
+    DECLARE @idShippingFee uniqueidentifier;
+
+    -- Temporary table to capture the inserted idShippingFee
+    DECLARE @InsertedFees TABLE (idShippingFee uniqueidentifier);
+
+    -- Start a transaction
+    BEGIN TRANSACTION;
+
+    -- Check if the SKU exists in tblShippingFees
+    IF EXISTS (SELECT 1 FROM tblShippingFees WHERE idMasterSKU = @idMasterSKU)
+    BEGIN
+        -- Get the idShippingFee of the existing entry
+        SELECT @idShippingFee = idShippingFee
+        FROM tblShippingFees
+        WHERE idMasterSKU = @idMasterSKU;
+
+        -- Update the existing record
+        UPDATE tblShippingFees
+        SET ShippingFee = @ShippingFee,
+            ModifyTime = GETDATE()
+        WHERE idMasterSKU = @idMasterSKU;
+    END
+    ELSE
+    BEGIN
+        -- Insert a new record and capture the idShippingFee using OUTPUT into the table variable
+        INSERT INTO tblShippingFees (idMasterSKU, ShippingFee, DateAdd, ModifyTime)
+        OUTPUT INSERTED.idShippingFee INTO @InsertedFees(idShippingFee)
+        VALUES (@idMasterSKU, @ShippingFee, GETDATE(), GETDATE());
+
+        -- Retrieve the inserted idShippingFee from the table variable
+        SELECT @idShippingFee = idShippingFee FROM @InsertedFees;
+    END
+
+    -- Insert into the history table
+    INSERT INTO tblShippingFeesHistory (idShippingFee, ShippingFee, DateAdd)
+    VALUES (@idShippingFee, @ShippingFee, GETDATE());
+
+    -- Commit the transaction if all operations succeed
+    COMMIT TRANSACTION;
+
+END
+GO

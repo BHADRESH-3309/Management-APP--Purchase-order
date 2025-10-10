@@ -1,0 +1,722 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Purchase Order";
+}
+
+@{
+    var editPurchaseOrderUrl = Url.Action("UpdatePurchaseOrder", "PurchaseOrder");
+}
+
+@{
+    var showSkuBaseUrl = Url.Action("Index", "MasterInventory");
+}
+
+@{
+    var showTitleBaseUrl = Url.Action("Index", "MappingSKU");
+}
+
+@if (ViewData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles
+{
+    <style>
+        /* Apply these styles to the table */
+        .datatable-table{
+            border-collapse: collapse!important;
+        }
+
+        #dataTable th {
+            border: 1px solid #ddd!important;
+            cursor: pointer;
+        }
+
+        #dataTable td {
+            border: 1px solid #ddd!important;
+        }
+
+        .colspan-textalign {
+            text-align: center !important;
+        }
+
+        .itemName {
+            max-width: 350px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .th-date {
+            width: 110px !important;
+        }
+
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+
+        @@media screen and (max-width: 3300px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+    </style>
+}
+
+<div class="positionrow" id="cardRow">
+    <div class="card" id="filterDiv">
+        <div class="card-body mt-2" style="display:flex">
+
+            <!-- PO Status Dropdown -->
+            <div>
+                <label class="col-form-label mt-2" style="font-weight: bold;">Status</label>
+                <div class="col-sm-3 d-flex " style="min-width:300px">
+                    <select class="form-select" id="status" aria-label="Default select example">
+                        <option selected value="All">All</option>
+                        <option value="Created">Created</option>
+                        <option value="Submitted">Submitted</option>
+                        <option value="Partial Received">Partial Received</option>
+                        <option value="Fully Received">Fully Received</option>
+                        <option value="Damage Received">Damage Received</option>
+                        <option value="Active">Active</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Purchase order Number Dropdown -->
+            <div style="margin-left: 110px;">
+                <label class="col-form-label mt-2" style="font-weight: bold;">PO Number</label>
+                <div class="col-sm-3 d-flex PODropdown" style="min-width:300px">
+                    @if (Model.poNumberList != null)
+                    {
+                        @Html.DropDownList("poNumber", new SelectList(Model.poNumberList, "idPurchaseOrder", "PONumber", Model.poNumberList),
+                                 new { id = "poNumber", @class = "form-select" })
+                    }
+                    else
+                    {
+                        @Html.DropDownList("poNumber", new List<SelectListItem> { }, "All", new { @class = "form-control" })
+                    }
+                </div>
+            </div>
+
+            <!-- PO Supplier Dropdown -->
+            <div style="margin-left: 110px;">
+                <label class="col-form-label mt-2" style="font-weight: bold;">Supplier Name</label>
+                <div class="col-sm-3 d-flex supplierDropdown" style="min-width:300px">
+                    @if (Model.supplerlist != null)
+                    {
+                        @Html.DropDownList("supplierName", new SelectList(Model.supplerlist, "idSupplier", "SupplierName", Model.supplerlist),
+                                 new { id = "supplierName", @class = "form-select" })
+                    }
+                    else
+                    {
+                        @Html.DropDownList("supplierName", new List<SelectListItem> { }, "All", new { @class = "form-control" })
+                    }
+                </div>
+            </div>
+
+            <!-- PO Brand Dropdown -->
+            <div style="margin-left: 110px;">
+                <label class="col-form-label mt-2" style="font-weight: bold;">Brand Name</label>
+                <div class="col-sm-3 d-flex brandDropdown" style="min-width:300px">
+                    @if (Model.brandNamelist != null)
+                    {
+                        @Html.DropDownList("brandName", new SelectList(Model.brandNamelist, "idBrand", "Brand", Model.brandNamelist),
+                                 new { id = "brandName", @class = "form-select" })
+                    }
+                    else
+                    {
+                        @Html.DropDownList("brandName", new List<SelectListItem> { }, "All", new { @class = "form-control" })
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card ">
+        <div class="card-body mt-2">
+            <div id="table-loading-spinner" class="table-overlay">
+                <div class="spinner-border" role="status">
+                </div>
+            </div>
+            <div class="datatable-wrapper datatable-loading no-footer sortable searchable fixed-columns">
+                <div class="datatable-top">
+                    <div class="datatable-dropdown">
+                        <label>
+                            <select class="datatable-selector" name="per-page" id="perPageSelector">
+                                <option value="20" selected="">20</option>
+                                <option value="40">40</option>
+                                <option value="60">60</option>
+                            </select> entries
+                        </label>
+                    </div>
+                    <div class="datatable-search">
+                        <input class="datatable-input" oninput="searchTable()" id="search" placeholder="Search..." type="search" name="search" title="Search within table" aria-controls="productTable">
+                        <button type="button" class="btn btn-secondary" style="margin-bottom: 3px;" onclick="exportExcel()">Export Excel</button>
+                        <button type="button" class="btn btn-secondary" style="margin-bottom: 3px;display:none;" id="clearFilterBtn" onclick="clearFilter()">Clear Filter</button>
+                    </div>
+                </div>
+                <div class="datatable-container">
+                    <table id="dataTable" class="table datatable-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2" data-column="srNo" onclick="sortTable('srNo')"><button class="datatable-sorter">#</button></th>
+                                <th rowspan="2" data-column="poNumber" onclick="sortTable('poNumber')"><button class="datatable-sorter">PO Number</button></th>
+                                <th rowspan="2" data-column="masterSKU" onclick="sortTable('masterSKU')"><button class="datatable-sorter th-SKU">Mst SKU</button></th>
+                                <th rowspan="2" data-column="itemName" onclick="sortTable('itemName')"><button class="datatable-sorter th-title">Item Name</button></th>
+                                <th rowspan="2" data-column="brand" onclick="sortTable('brand')"><button class="datatable-sorter th-title">Brand</button></th>
+                                <th rowspan="2" data-column="supplierName" onclick="sortTable('supplierName')"><button class="datatable-sorter">Supplier Name</button></th>
+                                <th rowspan="2" data-column="quantity" onclick="sortTable('quantity')"><button class="datatable-sorter">Total Items</button></th>
+                                <th rowspan="2" data-column="price" onclick="sortTable('price')"><button class="datatable-sorter">Total Cost(£)</button></th>
+                                <th rowspan="2" data-column="currency" onclick="sortTable('currency')"><button class="datatable-sorter">Currency</button></th>
+                                <th rowspan="2" data-column="exchange" onclick="sortTable('exchange')"><button class="datatable-sorter">Exchange(£)</button></th>
+                                <th rowspan="2" data-column="deliveryDate" onclick="sortTable('deliveryDate')"><button class="datatable-sorter th-date">Expected Delivery Date</button></th>
+                                <th rowspan="2" data-column="note" onclick="sortTable('note')"><button class="datatable-sorter th-Note">Note</button></th>
+
+                                <th rowspan="2" data-column="status" onclick="sortTable('status')"><button class="datatable-sorter">Status</button></th>
+                                <th rowspan="2" data-column="receivedDate" onclick="sortTable('receivedDate')"><button class="datatable-sorter th-date">Received Date</button></th>
+                                <th rowspan="2" data-column="receivedCount" onclick="sortTable('receivedCount')"><button class="datatable-sorter">Received Total Quantity</button></th>
+                                <th rowspan="2" data-column="damageCount" onclick="sortTable('damageCount')"><button class="datatable-sorter">Damage Count</button></th>
+                                <th rowspan="2" data-column="missingCount" onclick="sortTable('missingCount')"><button class="datatable-sorter">Missing Count</button></th>
+
+                                <th class="colspan-textalign" colspan="3">Quantity</th>
+
+                                <th rowspan="2" data-column="issueDescription" onclick="sortTable('issueDescription')"><button class="datatable-sorter th-issue">Issue Description</button></th>
+                                <th rowspan="2" data-column="invoiceName" onclick="sortTable('invoiceName')"><button class="datatable-sorter">Invoice Name</button></th>
+                                <th rowspan="2" data-column="action">Action</th>
+                            </tr>
+                            <tr>
+                                <th data-column="amershamQty" onclick="sortTable('amershamQty')"><button class="datatable-sorter">Amersham</button></th>
+                                <th data-column="watfordQty" onclick="sortTable('watfordQty')"><button class="datatable-sorter">Watford</button></th>
+                                <th data-column="totalQty" onclick="sortTable('totalQty')"><button class="datatable-sorter">Total</button></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="datatable-bottom">
+                    <div class="datatable-info" id="datatableInfo"></div>
+                    <nav class="datatable-pagination">
+                        <ul class="datatable-pagination-list" id="pagination">
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script>
+        var editPurchaseOrderUrl = '@editPurchaseOrderUrl';
+        let loadTimePurchaseOrderData = [];
+        let purchaseOrderData = [];
+        var showSkuBaseUrl = '@showSkuBaseUrl';
+        var showTitleBaseUrl = '@showTitleBaseUrl';
+        var selectedPO = '';
+
+        $(document).ready(function () {
+
+            selectedPO = new URLSearchParams(window.location.search).get('po');
+            if (selectedPO) {
+                $("#poNumber option").filter(function () {
+                    return $(this).text() === selectedPO;
+                }).prop("selected", true);
+            }
+
+            GetPurchaseOrder();
+
+            setTimeout(function () {
+                $("#alertMessage").fadeOut();
+                @{
+                    if (TempData.ContainsKey("SuccessMessage"))
+                    {
+                        TempData.Remove("SuccessMessage");
+                    }
+                    if (TempData.ContainsKey("ErrorMessage"))
+                    {
+                        TempData.Remove("ErrorMessage");
+                    }
+                }}, 3000);
+        })
+
+        $('#status, #supplierName, #brandName, #poNumber').change(function () {
+            GetPurchaseOrder();
+        });
+
+        //Function to fetch purchase order data.
+        function GetPurchaseOrder() {
+            
+            // Get selected values from dropdowns
+            var status = $('#status').val();
+            var supplierName = $('#supplierName option:selected').text();
+            var brand = $('#brandName option:selected').text();
+            var poNumber = $('#poNumber option:selected').text();
+
+            // Show spinner 
+            $('#table-loading-spinner').removeClass('d-none');
+
+            $.ajax({
+                url: '@Url.Action("GetPurchaseOrder", "PurchaseOrder")',
+                method: 'GET',
+                data: {
+                    status: status,
+                    supplierName: supplierName,
+                    brand: brand,
+                    poNumber : poNumber,
+                    selectedPO: selectedPO
+                },
+                dataType: 'json',
+                success: function (response) {
+                    // Hide spinner
+                    $('#table-loading-spinner').addClass('d-none');
+
+                    if (!response.isError) {
+                        const dataWithSrNo = response.result.map((item, index) => ({
+                            srNo: index + 1, // serial number starting from 1
+                            ...item,
+                            price: item.price.toFixed(2),
+                            exchange: item.exchange.toFixed(2)
+                        }));
+
+                        purchaseOrderData = dataWithSrNo;
+                        loadTimePurchaseOrderData = dataWithSrNo;
+                        displayTable(dataWithSrNo)
+                    } 
+                    else 
+                    {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function (error) {
+                    $('#table-loading-spinner').addClass('d-none');
+                    console.error('Error fetching data:', error);
+                }
+            });
+        }
+
+        function escapeString(str) {
+            if (str == null) return "";
+
+            // Escape single quotes, double quotes, backslashes, and other characters if necessary
+            return str.replace(/\\/g, '\\\\') // Escape backslashes
+                .replace(/'/g, "\\'") // Escape single quotes
+                .replace(/"/g, '\\"')  // Escape double quotes
+                .replace(/\n/g, '\\n')  // Escape newlines
+                .replace(/\r/g, '\\r'); // Escape carriage returns
+        }
+
+        let currentPage = 1;
+        let rowsPerPage = parseInt(document.getElementById('perPageSelector').value);
+        let stockDataMap = {};
+
+        //Function to display table with pagination.
+        function displayTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                const noDataMessage = document.createElement('tr');
+                if (loadTimePurchaseOrderData.length === 0) {
+                    noDataMessage.innerHTML = '<td class="datatable-empty" colspan="23">No entries found</td>';
+                } else {
+                    noDataMessage.innerHTML = '<td class="datatable-empty" colspan="23">No results match your search query</td>';
+                }
+                tableBody.appendChild(noDataMessage);
+
+                updatePagination(0);
+                updateInfo(0, 0, 0);
+                return;
+
+            } else {
+                const query = document.getElementById('search').value.trim().toLowerCase();
+
+                if (isNullOrEmpty(query)) {
+                    purchaseOrderData = loadTimePurchaseOrderData;
+                } else {
+                    const filteredData = loadTimePurchaseOrderData.filter(row => {
+                        return Object.values(row).some(value => value?.toString().toLowerCase().includes(query));
+                    });
+
+                    purchaseOrderData = filteredData;
+                }
+
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                const paginatedData = purchaseOrderData.slice(start, end);
+
+                paginatedData.forEach(row => {
+                    const tr = document.createElement('tr');
+
+                    const itemName = escapeString(row.itemName);
+                
+                    tr.innerHTML = `
+                                        <td>${row.srNo}
+                                            <input type="hidden" class="idPurchaseOrder" value="${row.idPurchaseOrderProduct}" />
+                                        </td>                                    
+                                        <td>${row.poNumber || ''}</td>
+                                        <td><p class="title"><a href="${showSkuBaseUrl}?sku=${row.masterSKU}" title = "Click to Show Master SKU Details" target = "_blank" > ${ row.masterSKU }</a></p></td>
+                                        <td class="itemName"><p><a href="${showTitleBaseUrl}?sku=${row.masterSKU}" title="Click to Show Mapping SKU" target="_blank">${row.itemName || ''}</a></p></td>                                      
+                                        <td>${row.brand || ''}</td>
+                                        <td>${row.supplierName || ''}</td>
+                                        <td>${row.quantity || ''}</td>
+                                        <td>${row.price}</td>
+                                        <td>${row.currency || ''}</td>
+                                        <td>${row.exchange}</td>
+                                        <td>${row.deliveryDate ? formatDateTime(row.deliveryDate) : ''}</td>
+                                        <td>${row.note || ''}</td>
+                                        <td>${row.status || ''}</td>
+                                        <td>${row.receivedDate ? formatDateTime(row.receivedDate) : ''}</td>
+                                        <td>${row.receivedCount || ''}</td>
+                                        <td>${row.damageCount || ''}</td>
+                                        <td>${row.missingCount || ''}</td>
+                                       
+                                        <td>${row.amershamQty || ''}</td>
+                                        <td>${row.watfordQty || ''}</td>
+                                        <td>${row.totalQty || ''}</td>
+                                        
+                                        <td>${row.issueDescription || ''}</td>
+                                        <td>${row.invoiceName || ''}</td>
+                                        <td>
+                                            <div class="btn-group" role="group" aria-label="PO Actions">
+                                             <a href="${editPurchaseOrderUrl}?id=${row.idPurchaseOrderProduct}" class="btn btn-primary btnEdit"
+                                             data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit Purchase Order" target="_blank">
+                                            <i class="bi bi-pencil-square"></i></a>
+                                            </div>
+                                        </td>`;
+                    tableBody.appendChild(tr);
+                });
+
+                $(document).on('mouseenter', '.itemName', function () {
+                    const $this = $(this);
+                    if ($this.width() < $this[0].scrollWidth) {
+                        $this.css('white-space', 'normal');
+                    }
+                });
+                $(document).on('mouseleave', '.itemName', function () {
+                    const $this = $(this);
+                    $this.css('white-space', 'nowrap');
+                });            
+
+                updatePagination(data.length);
+                updateInfo(data.length, start + 1, Math.min(end, data.length));
+            }
+        }
+
+        //Function to update pagination controls.
+        function updatePagination(totalRows) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+            if (totalRows === 0) {
+                return;
+            }
+
+            // Previous button
+            if (currentPage > 1) {
+                const prevButton = createPaginationButton('‹', currentPage - 1);
+                pagination.appendChild(prevButton);
+            } else {
+                const prevButton = createPaginationButton('‹', currentPage - 1, true);
+                pagination.appendChild(prevButton);
+            }
+
+            // Show first 7 pages
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) {
+                    const button = createPaginationButton(i, i, false, i === currentPage);
+                    pagination.appendChild(button);
+                }
+            } else {
+                // Always show the first page
+                pagination.appendChild(createPaginationButton(1, 1, false, currentPage === 1));
+
+                // Show ellipsis after the first 7 pages if needed
+                if (currentPage > 5) {
+                    pagination.appendChild(createPaginationButton('...', 0, true));
+                }
+
+                // Calculate start and end pages for the middle section
+                let startPage = Math.max(2, currentPage - 2);
+                let endPage = Math.min(totalPages - 1, currentPage + 2);
+
+                // Adjust start and end pages if close to the beginning or end
+                if (currentPage <= 5) {
+                    startPage = 2;
+                    endPage = Math.min(7, totalPages - 1);
+                }
+                if (currentPage >= totalPages - 4) {
+                    startPage = Math.max(totalPages - 6, 2);
+                    endPage = totalPages - 1;
+                }
+
+                // Show middle pages
+                for (let i = startPage; i <= endPage; i++) {
+                    const button = createPaginationButton(i, i, false, i === currentPage);
+                    pagination.appendChild(button);
+                }
+
+                // Show ellipsis before the last page if needed
+                if (currentPage < totalPages - 4) {
+                    pagination.appendChild(createPaginationButton('...', 0, true));
+                }
+
+                // Always show the last page
+                if (totalPages > 1) {
+                    pagination.appendChild(createPaginationButton(totalPages, totalPages, false, currentPage === totalPages));
+                }
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                const nextButton = createPaginationButton('›', currentPage + 1);
+                pagination.appendChild(nextButton);
+            } else {
+                const nextButton = createPaginationButton('›', currentPage + 1, true);
+                pagination.appendChild(nextButton);
+            }
+        }
+
+        //Function to create a pagination button.
+        function createPaginationButton(text, page, disabled = false, active = false) {
+            const li = document.createElement('li');
+            li.className = 'datatable-pagination-list-item';
+            if (disabled) li.classList.add('datatable-disabled');
+            if (active) li.classList.add('datatable-active');
+
+            const button = document.createElement('button');
+            button.textContent = text;
+            button.dataset.page = page;
+            button.disabled = disabled;
+            button.onclick = () => {
+                if (!disabled) {
+                    currentPage = page;
+                    displayTable(purchaseOrderData);
+                }
+            };
+
+            li.appendChild(button);
+            return li;
+        }
+
+        function updateInfo(totalRows, start, end) {
+            const info = document.getElementById('datatableInfo');
+            if (totalRows === 0) {
+                info.textContent = '';
+            } else {
+                info.textContent = `Showing ${start} to ${end} of ${totalRows} entries`;
+            }
+        }
+
+        //Function to sort the table by a specified column.
+        let previousSortColumn = null;
+        function sortTable(column) {
+            const table = document.getElementById('dataTable');
+            const headers = table.querySelectorAll('th');
+
+            headers.forEach(header => {
+                const headerColumn = header.getAttribute('data-column');
+                if (headerColumn === column) {
+                    const currentSort = header.getAttribute('aria-sort');
+                    const newSort = currentSort === 'ascending' ? 'descending' : 'ascending';
+                    header.setAttribute('aria-sort', newSort);
+                    header.classList.toggle('datatable-ascending', newSort === 'ascending');
+                    header.classList.toggle('datatable-descending', newSort === 'descending');
+                } else {
+                    header.removeAttribute('aria-sort');
+                    header.classList.remove('datatable-ascending', 'datatable-descending');
+                }
+            });
+
+            let direction = document.getElementById('dataTable').dataset.sortDirection === 'ascending' ? 'descending' : 'ascending';
+
+            if (column != previousSortColumn) {
+                direction = 'ascending';
+            }
+
+            table.dataset.sortDirection = direction;
+            previousSortColumn = column;
+
+            purchaseOrderData.sort((a, b) => {
+                const valueA = a[column] || '';
+                const valueB = b[column] || '';
+
+                // Check if values are numbers
+                const isValueANumber = !isNaN(parseFloat(valueA));
+                const isValueBNumber = !isNaN(parseFloat(valueB));
+
+                if (isValueANumber && isValueBNumber) {
+                    // Compare as numbers
+                    return direction === 'ascending' ? valueA - valueB : valueB - valueA;
+                } else {
+                    // Compare as strings
+                    const strA = valueA.toString().toLowerCase();
+                    const strB = valueB.toString().toLowerCase();
+                    if (strA < strB) {
+                        return direction === 'ascending' ? -1 : 1;
+                    }
+                    if (strA > strB) {
+                        return direction === 'ascending' ? 1 : -1;
+                    }
+                    return 0;
+                }
+            });
+            currentPage = 1;
+            displayTable(purchaseOrderData);
+        }
+
+        //Function for the searching functinality in the table.
+        function searchTable() {
+
+            const query = document.getElementById('search').value.trim().toLowerCase();
+
+            if (isNullOrEmpty(query)) {
+                purchaseOrderData = loadTimePurchaseOrderData;
+            } else {
+                const filteredData = loadTimePurchaseOrderData.filter(row => {
+                    return Object.values(row).some(value => value?.toString().toLowerCase().includes(query));
+                });
+                purchaseOrderData = filteredData;
+            }
+            currentPage = 1;
+
+            displayTable(purchaseOrderData);
+        }
+
+        function isNullOrEmpty(value) {
+            return value === null || value === undefined || value === '' || (typeof value === 'string' && value.trim() === '');
+        }
+
+        function exportExcel() {
+            // Export to Excel functionality
+
+            const mappedPOData = purchaseOrderData.map((row, index) => [row.srNo, row.poNumber, row.masterSKU, 
+                row.itemName, row.brand, row.supplierName, row.quantity, row.price, row.currency, row.exchange, 
+                row.deliveryDate, row.note, row.status, row.receivedDate, row.receivedCount, row.damageCount, 
+                row.missingCount, row.amershamQty, row.watfordQty, row.totalQty, row.issueDescription, row.invoiceName]);
+
+            const combinedArray = [
+                ["#", "PO Number", "Mst SKU", "Item Name", "Brand", "Supplier Name", "Total Items", "Total Cost(£)", "Currency",
+                    "Exchange(£)", "Expected Delivery Date", "Note", "Status", "Received Date", "Received Total Quantity", 
+                    "Damage Count", "Missing Count", "Amersham Quantity", "Watford Quantity", "Total Quantity", 
+                    "Issue Description", "Invoice Name"],
+                ...mappedPOData
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+            // Define columns for specific formats
+            const numberColumns = [2, 7, 15, 16, 17, 18, 19, 20]; // Columns that need to be numbers
+            const decimalColumns = [8, 10]; // Columns that need to be decimals
+
+            // Loop through the worksheet rows to apply formats to specified columns
+            Object.keys(ws).forEach((cell) => {
+                if (!cell.startsWith('!')) { // Skip worksheet metadata
+                    const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                    // Check if the column is in the number list
+                    if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                        ws[cell].t = 'n'; // Set cell type to 'number'
+                        ws[cell].z = '0'; // Format as integer
+                    }
+
+                    // Check if the column is in the decimal list
+                    if (decimalColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                        ws[cell].t = 'n'; // Set cell type to 'number'
+                        ws[cell].z = '0.00'; // Format as decimal (2 decimal places)
+                    }
+                }
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+            saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Purchase Order.xlsx');
+        }
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+
+        document.getElementById('perPageSelector').addEventListener('change', (event) => {
+            rowsPerPage = parseInt(event.target.value);
+            currentPage = 1;  // Reset to first page
+            displayTable(purchaseOrderData);
+        });
+
+        function isNumber(evt, element) {
+            var charCode = (evt.which) ? evt.which : event.keyCode;
+            var inputValue = $(element).val();
+
+            // Allow only digits (0-9) and backspace
+            if ((charCode < 48 || charCode > 57) && charCode !== 8) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function safeParseInt(value) {
+            const parsedValue = parseInt(value, 10);
+            return isNaN(parsedValue) ? 0 : parsedValue;
+        }
+
+        // Formatting function
+        function formatDateTime(dateString) {
+
+            if (!dateString) {
+                return '';
+            }
+            const date = new Date(dateString);
+
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // months are 0-based
+            const year = date.getFullYear();
+
+            return `${day}-${month}-${year}`;
+
+            // Combine formatted date and time
+            return `${formattedDate} ${formattedTime}`;
+        }
+    </script>
+}

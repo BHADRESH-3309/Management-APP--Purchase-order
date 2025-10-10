@@ -1,0 +1,101 @@
+﻿GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		Dharmil Patel
+-- Create date: 24-October-2024
+-- Description:	Get Sync Inventory data
+-- =============================================
+CREATE PROCEDURE spGetSyncInventoryData
+	@SalesChannel NVARCHAR(100)
+AS
+BEGIN
+
+	WITH SyncInventory AS (
+		SELECT 
+			si.idSyncInventory, 
+			si.idMasterSKU, 
+			si.SalesChannel, 
+			si.SyncQuantity, 
+			si.SyncTime, 
+			si.IsSyncProcessEnable, 
+			si.MarketplaceSKU
+		FROM tblSyncInventory si 
+		JOIN tblMasterSKU ms ON si.idMasterSKU = ms.idMasterSKU 
+		WHERE si.SalesChannel = @SalesChannel
+	),
+	FBAQuantities AS (
+		SELECT 
+			m.sku AS MasterSKU, 
+			m.idMasterSKU,
+			CASE
+				WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+				ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+			END AS FBA
+		FROM tblMastersku m
+		LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon'
+		LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku
+		GROUP BY m.sku, m.idMasterSKU
+	),
+	StockQuantities AS (
+		SELECT 
+			m.sku AS MasterSKU,
+			CASE 
+				WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+				ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE 0 END), 0)
+			END AS AmershamQty,
+			CASE 
+				WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+				ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE 0 END), 0)
+			END AS WatfordQty
+		FROM tblMastersku m
+		LEFT JOIN tblStockLocation sl ON m.idMasterSKU = sl.idMasterSKU
+		GROUP BY m.sku
+	),
+	MarketplaceQuantities AS (
+		SELECT 
+			m.sku AS MasterSKU,
+			SUM(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' THEN ai.Quantity ELSE 0 END) AS AmazonQty,
+			SUM(CASE WHEN LOWER(mp.SalesChannel) = 'ebay' THEN ei.Quantity ELSE 0 END) AS eBayQty,
+			SUM(CASE WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.Quantity ELSE 0 END) AS OnBuyQty,
+			SUM(CASE WHEN LOWER(mp.SalesChannel) = 'shopify' THEN si.Quantity ELSE 0 END) AS ShopifyQty
+		FROM tblMastersku m
+		LEFT JOIN tblMappingsku mp ON m.idMasterSKU = mp.idMasterSKU
+		LEFT JOIN tblAmazonInventory ai ON mp.sku = ai.SKU 
+		LEFT JOIN tblEbayInventory ei ON mp.sku = ei.SKU 
+		LEFT JOIN tblOnbuyInventory oi ON mp.sku = oi.SKU 
+		LEFT JOIN tblShopifyInventory si ON mp.sku = si.SKU 
+		GROUP BY m.sku
+	)
+	SELECT 
+		si.idSyncInventory,
+		si.idMasterSKU,
+		si.MarketplaceSKU,
+		mq.MasterSKU AS MasterSKU,
+		CASE 
+			WHEN LOWER(si.SalesChannel) = 'amazon' THEN COALESCE(sq.AmershamQty, 0) + COALESCE(sq.WatfordQty, 0)
+			ELSE COALESCE(sq.AmershamQty, 0) + COALESCE(sq.WatfordQty, 0) + COALESCE(fba.FBA, 0)  -- Include FBA quantity if not Amazon
+		END AS MasterSKUQuantity,
+		 -- Use a specific join for the MarketplaceSKU for the selected SalesChannel
+		CASE 
+			WHEN LOWER(si.SalesChannel) = 'amazon' THEN 
+				(SELECT ai.Quantity FROM tblAmazonInventory ai WHERE ai.SKU = si.MarketplaceSKU)
+			WHEN LOWER(si.SalesChannel) = 'ebay' THEN 
+				(SELECT ei.Quantity FROM tblEbayInventory ei WHERE ei.SKU = si.MarketplaceSKU)
+			WHEN LOWER(si.SalesChannel) = 'onbuy' THEN 
+				(SELECT oi.Quantity FROM tblOnbuyInventory oi WHERE oi.SKU = si.MarketplaceSKU)
+			WHEN LOWER(si.SalesChannel) = 'shopify' THEN 
+				(SELECT s.Quantity FROM tblShopifyInventory s WHERE s.SKU = si.MarketplaceSKU)  -- Corrected alias here
+			ELSE 0 -- Default value if SalesChannel does not match any of the cases
+		END AS MarketplaceSKUQuantity,
+		si.SalesChannel,
+		si.SyncQuantity,
+		si.SyncTime,
+		si.IsSyncProcessEnable
+	FROM SyncInventory si
+	JOIN FBAQuantities fba ON fba.idMasterSKU = si.idMasterSKU
+	JOIN StockQuantities sq ON sq.MasterSKU = fba.MasterSKU
+	JOIN MarketplaceQuantities mq ON mq.MasterSKU = fba.MasterSKU
+	ORDER BY si.SyncTime DESC;
+		
+END

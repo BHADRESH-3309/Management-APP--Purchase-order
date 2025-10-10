@@ -1,0 +1,387 @@
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		AEScope
+-- Create date: 2-August-2024
+-- Description:	Get Master Inventory data
+-- =============================================
+CREATE PROCEDURE spGetMasterInventoryData
+	
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+    -- Insert statements for procedure here
+	WITH InventoryPrices AS (
+        SELECT 
+            m.sku AS MasterSKU,
+			m.Title, sf.ShippingFee,
+            MIN(COALESCE(ai.price, 100000)) AS amazon_min_price,
+            MIN(COALESCE(ei.price, 100000)) AS ebay_min_price,
+            MIN(COALESCE(oi.price, 100000)) AS onbuy_min_price,
+			MIN(COALESCE(si.price, 100000)) AS shopify_min_price,
+            MAX(COALESCE(ai.price, 0)) AS amazon_max_price,
+            MAX(COALESCE(ei.price, 0)) AS ebay_max_price,
+            MAX(COALESCE(oi.price, 0)) AS onbuy_max_price,
+			MAX(COALESCE(si.price, 0)) AS shopify_max_price
+        FROM tblMastersku m
+            LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon'
+            LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku
+            LEFT JOIN tblMappingsku mp_ebay ON m.idMasterSKU = mp_ebay.idMasterSKU AND LOWER(mp_ebay.SalesChannel) = 'ebay'
+            LEFT JOIN tblEbayInventory ei ON mp_ebay.sku = ei.sku
+            LEFT JOIN tblMappingsku mp_onbuy ON m.idMasterSKU = mp_onbuy.idMasterSKU AND LOWER(mp_onbuy.SalesChannel) = 'onbuy'
+            LEFT JOIN tblOnbuyInventory oi ON mp_onbuy.sku = oi.sku
+			LEFT JOIN tblMappingsku mp_shopify ON m.idMasterSKU = mp_shopify.idMasterSKU AND LOWER(mp_shopify.SalesChannel) = 'shopify'
+            LEFT JOIN tblShopifyInventory si ON mp_shopify.sku = si.sku
+			LEFT JOIN tblShippingFees sf ON m.idMasterSKU = sf.idMasterSKU
+        GROUP BY m.sku, m.Title, sf.ShippingFee
+        ),
+        FBAQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE
+                    WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+                END AS FBA
+            FROM tblMastersku m
+            LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon'
+            LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku
+            GROUP BY m.sku
+        ),
+        StockQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU, sl.AvgCostPrice,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.Quantity ELSE 0 END), 0)
+                END AS AmershamQty,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.Quantity ELSE 0 END), 0)
+                END AS WatfordQty,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.DamagedQuantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN sl.DamagedQuantity ELSE 0 END), 0)
+                END AS DamagedAmershamQty,
+                CASE 
+                    WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.DamagedQuantity ELSE NULL END) IS NULL THEN NULL
+                    ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' THEN sl.DamagedQuantity ELSE 0 END), 0)
+                END AS DamagedWatfordQty
+            FROM tblMastersku m
+            LEFT JOIN tblStockLocation sl ON m.idMasterSKU = sl.idMasterSKU
+            GROUP BY m.sku,  sl.AvgCostPrice
+        ),
+        MarketplaceQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE 
+                    WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' THEN ai.Quantity END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'amazon' THEN ai.Quantity END), 0), 0)
+                END AS AmazonQty,
+                CASE 
+                    WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'ebay' THEN ei.Quantity END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'ebay' THEN ei.Quantity END), 0), 0)
+                END AS eBayQty,
+                CASE 
+                    WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.Quantity END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.Quantity END), 0), 0)
+                END AS OnBuyQty,
+				CASE 
+                    WHEN COUNT(CASE WHEN LOWER(mp.SalesChannel) = 'shopify' THEN si.Quantity END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN LOWER(mp.SalesChannel) = 'shopify' THEN si.Quantity END), 0), 0)
+                END AS ShopifyQty
+            FROM tblMastersku m
+            LEFT JOIN tblMappingsku mp ON m.idMasterSKU = mp.idMasterSKU
+            LEFT JOIN tblAmazonInventory ai ON mp.sku = ai.SKU 
+            LEFT JOIN tblEbayInventory ei ON mp.sku = ei.SKU 
+            LEFT JOIN tblOnbuyInventory oi ON mp.sku = oi.SKU 
+			LEFT JOIN tblShopifyInventory si ON mp.sku = si.SKU 
+            GROUP BY m.sku
+        ),
+        -- CTEs to calculate Actual selling prices
+        AmazonPrices30days AS (
+            SELECT m.sku AS MasterSKU, SUM(aih.price) AS amazon_price 
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblAmazonInventory ai ON mps.sku = ai.sku
+            JOIN tblAmazonInventoryHistory aih ON ai.idAmazonInventory = aih.idAmazonInventory
+            WHERE LOWER(mps.SalesChannel) = 'amazon' 
+                AND aih.DateAdd >= DATEADD(day, -30, CAST(GETDATE() AS DATE)) 
+                AND aih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        eBayPrices30days AS (
+            SELECT m.sku AS MasterSKU, SUM(eih.price) AS ebay_price 
+            FROM tblMastersku m      
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblEbayInventory ei ON mps.sku = ei.sku
+            JOIN tblEbayInventoryHistory eih ON ei.idEbayInventory = eih.idEbayInventory
+            WHERE LOWER(mps.SalesChannel) = 'ebay'
+                AND eih.DateAdd >= DATEADD(day, -30, CAST(GETDATE() AS DATE)) 
+                AND eih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        OnbuyPrices30days AS (
+            SELECT m.sku AS MasterSKU, SUM(oih.price) AS onbuy_price             
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblOnbuyInventory oi ON mps.sku = oi.sku
+            JOIN tblOnbuyInventoryHistory oih ON oi.idOnbuyInventory = oih.idOnbuyInventory
+            WHERE LOWER(mps.SalesChannel) = 'onbuy'
+                AND oih.DateAdd >= DATEADD(day, -30, CAST(GETDATE() AS DATE)) 
+                AND oih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+		ShopifyPrices30days AS (
+            SELECT m.sku AS MasterSKU, SUM(sih.price) AS Shopify_price             
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblShopifyInventory si ON mps.sku = si.sku
+            JOIN tblShopifyInventoryHistory sih ON si.idShopifyInventory = sih.idShopifyInventory
+            WHERE LOWER(mps.SalesChannel) = 'shopify'
+                AND sih.DateAdd >= DATEADD(day, -30, CAST(GETDATE() AS DATE)) 
+                AND sih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        AmazonPrices60days AS (
+            SELECT m.sku AS MasterSKU, SUM(aih.price) AS amazon_price               
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblAmazonInventory ai ON mps.sku = ai.sku
+            JOIN tblAmazonInventoryHistory aih ON ai.idAmazonInventory = aih.idAmazonInventory
+            WHERE LOWER(mps.SalesChannel) = 'amazon'
+                AND aih.DateAdd >= DATEADD(day, -60, CAST(GETDATE() AS DATE)) 
+                AND aih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        eBayPrices60days AS (
+            SELECT m.sku AS MasterSKU, SUM(eih.price) AS ebay_price   
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblEbayInventory ei ON mps.sku = ei.sku
+            JOIN tblEbayInventoryHistory eih ON ei.idEbayInventory = eih.idEbayInventory
+            WHERE LOWER(mps.SalesChannel) = 'ebay'
+                AND eih.DateAdd >= DATEADD(day, -60, CAST(GETDATE() AS DATE)) 
+                AND eih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        OnbuyPrices60days AS (
+            SELECT m.sku AS MasterSKU, SUM(oih.price) AS onbuy_price
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblOnbuyInventory oi ON mps.sku = oi.sku
+            JOIN tblOnbuyInventoryHistory oih ON oi.idOnbuyInventory = oih.idOnbuyInventory
+            WHERE LOWER(mps.SalesChannel) = 'onbuy'
+                AND oih.DateAdd >= DATEADD(day, -60, CAST(GETDATE() AS DATE)) 
+                AND oih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+		ShopifyPrices60days AS (
+            SELECT m.sku AS MasterSKU, SUM(sih.price) AS Shopify_price             
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblShopifyInventory si ON mps.sku = si.sku
+            JOIN tblShopifyInventoryHistory sih ON si.idShopifyInventory = sih.idShopifyInventory
+            WHERE LOWER(mps.SalesChannel) = 'shopify'
+                AND sih.DateAdd >= DATEADD(day, -60, CAST(GETDATE() AS DATE)) 
+                AND sih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        AmazonPrices90days AS (
+            SELECT m.sku AS MasterSKU, SUM(aih.price) AS amazon_price
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblAmazonInventory ai ON mps.sku = ai.sku
+            JOIN tblAmazonInventoryHistory aih ON ai.idAmazonInventory = aih.idAmazonInventory
+            WHERE LOWER(mps.SalesChannel) = 'amazon'
+                AND aih.DateAdd >= DATEADD(day, -90, CAST(GETDATE() AS DATE)) 
+                AND aih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        eBayPrices90days AS (
+            SELECT m.sku AS MasterSKU, SUM(eih.price) AS ebay_price
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblEbayInventory ei ON mps.sku = ei.sku
+            JOIN tblEbayInventoryHistory eih ON ei.idEbayInventory = eih.idEbayInventory
+            WHERE LOWER(mps.SalesChannel) = 'ebay'
+                AND eih.DateAdd >= DATEADD(day, -90, CAST(GETDATE() AS DATE)) 
+                AND eih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+        OnbuyPrices90days AS (
+            SELECT m.sku AS MasterSKU, SUM(oih.price) AS onbuy_price
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblOnbuyInventory oi ON mps.sku = oi.sku
+            JOIN tblOnbuyInventoryHistory oih ON oi.idOnbuyInventory = oih.idOnbuyInventory
+            WHERE LOWER(mps.SalesChannel) = 'onbuy'
+                AND oih.DateAdd >= DATEADD(day, -90, CAST(GETDATE() AS DATE)) 
+                AND oih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        ),
+		ShopifyPrices90days AS (
+            SELECT m.sku AS MasterSKU, SUM(sih.price) AS Shopify_price             
+            FROM tblMastersku m
+            JOIN tblMappingsku mps ON m.idMasterSKU = mps.idMasterSKU
+            JOIN tblShopifyInventory si ON mps.sku = si.sku
+            JOIN tblShopifyInventoryHistory sih ON si.idShopifyInventory = sih.idShopifyInventory
+            WHERE LOWER(mps.SalesChannel) = 'shopify'
+                AND sih.DateAdd >= DATEADD(day, -90, CAST(GETDATE() AS DATE)) 
+                AND sih.DateAdd < CAST(GETDATE() AS DATE) 
+            GROUP BY m.sku
+        )
+        -- Final Query combining Min/Max and Actual Selling Prices
+        SELECT 
+            ip.MasterSKU,
+			ip.Title,
+			ip.ShippingFee,
+            fba.FBA,
+            sq.AmershamQty,
+            sq.WatfordQty,
+			CASE
+                WHEN sq.AmershamQty IS NULL AND sq.WatfordQty IS NULL AND fba.FBA IS NULL THEN NULL
+                ELSE COALESCE(sq.AmershamQty, 0) + COALESCE(sq.WatfordQty, 0) + COALESCE(fba.FBA, 0)
+            END AS TotalQty,
+            sq.DamagedAmershamQty,
+            sq.DamagedWatfordQty,
+			sq.AvgCostPrice,
+            mpq.AmazonQty,
+            mpq.eBayQty,
+            mpq.OnBuyQty,
+			mpq.ShopifyQty,
+            CASE
+                WHEN ip.amazon_min_price = 100000 AND ip.ebay_min_price = 100000 AND ip.onbuy_min_price = 100000 AND ip.shopify_min_price = 10000 THEN 0
+                ELSE LEAST(
+                    COALESCE(ip.amazon_min_price, 100000), 
+                    COALESCE(ip.ebay_min_price, 100000), 
+                    COALESCE(ip.onbuy_min_price, 100000),
+					COALESCE(ip.shopify_min_price, 100000)
+                )
+            END AS MinSellingPrice,
+            GREATEST(
+                COALESCE(ip.amazon_max_price, 0), 
+                COALESCE(ip.ebay_max_price, 0), 
+                COALESCE(ip.onbuy_max_price, 0),
+				COALESCE(ip.shopify_max_price, 0)
+            ) AS MaxSellingPrice,
+
+            -- Calculate the 30,60 and 90 days Actual selling price with multiple conditions.
+            CASE
+                WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 4				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0)) / 3				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 3			
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 3				
+				WHEN COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 3				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(ep30days.ebay_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(ep30days.ebay_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap30days.amazon_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(op30days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(op30days.onbuy_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(ep30days.ebay_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ep30days.ebay_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(op30days.onbuy_price, 0) > 0 AND COALESCE(sp30days.Shopify_price, 0) > 0 THEN
+					((COALESCE(op30days.onbuy_price, 0) / 30.0) + (COALESCE(sp30days.Shopify_price, 0) / 30.0)) / 2				
+				WHEN COALESCE(ap30days.amazon_price, 0) > 0 THEN (COALESCE(ap30days.amazon_price, 0) / 30.0)
+				WHEN COALESCE(ep30days.ebay_price, 0) > 0 THEN (COALESCE(ep30days.ebay_price, 0) / 30.0)
+				WHEN COALESCE(op30days.onbuy_price, 0) > 0 THEN (COALESCE(op30days.onbuy_price, 0) / 30.0)
+				WHEN COALESCE(sp30days.Shopify_price, 0) > 0 THEN (COALESCE(sp30days.Shopify_price, 0) / 30.0)
+				ELSE 0
+            END AS _30daysSellingPrice,
+
+            CASE
+                WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 4				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0)) / 3				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 3				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 3				
+				WHEN COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 3				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(ep60days.ebay_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(ep60days.ebay_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ap60days.amazon_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(op60days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(op60days.onbuy_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(ep60days.ebay_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(ep60days.ebay_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(op60days.onbuy_price, 0) > 0 AND COALESCE(sp60days.Shopify_price, 0) > 0 THEN
+					((COALESCE(op60days.onbuy_price, 0) / 60.0) + (COALESCE(sp60days.Shopify_price, 0) / 60.0)) / 2				
+				WHEN COALESCE(ap60days.amazon_price, 0) > 0 THEN (COALESCE(ap60days.amazon_price, 0) / 60.0)
+				WHEN COALESCE(ep60days.ebay_price, 0) > 0 THEN (COALESCE(ep60days.ebay_price, 0) / 60.0)
+				WHEN COALESCE(op60days.onbuy_price, 0) > 0 THEN (COALESCE(op60days.onbuy_price, 0) / 60.0)
+				WHEN COALESCE(sp60days.Shopify_price, 0) > 0 THEN (COALESCE(sp60days.Shopify_price, 0) / 60.0)
+				ELSE 0
+            END AS _60daysSellingPrice,
+
+			CASE
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 4
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0)) / 3
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 3
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 3
+				WHEN COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 3
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(ep90days.ebay_price, 0) > 0 THEN 
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(ep90days.ebay_price, 0) / 90.0)) / 2
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0)) / 2
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ap90days.amazon_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 2
+				WHEN COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(op90days.onbuy_price, 0) > 0 THEN
+					((COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(op90days.onbuy_price, 0) / 90.0)) / 2
+				WHEN COALESCE(ep90days.ebay_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(ep90days.ebay_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 2
+				WHEN COALESCE(op90days.onbuy_price, 0) > 0 AND COALESCE(sp90days.shopify_price, 0) > 0 THEN
+					((COALESCE(op90days.onbuy_price, 0) / 90.0) + (COALESCE(sp90days.shopify_price, 0) / 90.0)) / 2
+				WHEN COALESCE(ap90days.amazon_price, 0) > 0 THEN (COALESCE(ap90days.amazon_price, 0) / 90.0)
+				WHEN COALESCE(ep90days.ebay_price, 0) > 0 THEN (COALESCE(ep90days.ebay_price, 0) / 90.0)
+				WHEN COALESCE(op90days.onbuy_price, 0) > 0 THEN (COALESCE(op90days.onbuy_price, 0) / 90.0)
+				WHEN COALESCE(sp90days.shopify_price, 0) > 0 THEN (COALESCE(sp90days.shopify_price, 0) / 90.0)
+				ELSE 0
+			END AS _90daysSellingPrice
+
+        FROM 
+            InventoryPrices ip
+            LEFT JOIN FBAQuantities fba ON ip.MasterSKU = fba.MasterSKU
+            LEFT JOIN StockQuantities sq ON ip.MasterSKU = sq.MasterSKU
+            LEFT JOIN MarketplaceQuantities mpq ON ip.MasterSKU = mpq.MasterSKU
+
+            FULL OUTER JOIN AmazonPrices30days ap30days ON ip.MasterSKU = ap30days.MasterSKU
+            FULL OUTER JOIN eBayPrices30days ep30days ON ip.MasterSKU = ep30days.MasterSKU
+            FULL OUTER JOIN OnbuyPrices30days op30days ON ip.MasterSKU = op30days.MasterSKU
+			FULL OUTER JOIN ShopifyPrices30days sp30days ON ip.MasterSKU = sp30days.MasterSKU
+
+            FULL OUTER JOIN AmazonPrices60days ap60days ON ip.MasterSKU = ap60days.MasterSKU
+            FULL OUTER JOIN eBayPrices60days ep60days ON ip.MasterSKU = ep60days.MasterSKU
+            FULL OUTER JOIN OnbuyPrices60days op60days ON ip.MasterSKU = op60days.MasterSKU
+			FULL OUTER JOIN ShopifyPrices60days sp60days ON ip.MasterSKU = sp60days.MasterSKU
+
+            FULL OUTER JOIN AmazonPrices90days ap90days ON ip.MasterSKU = ap90days.MasterSKU
+            FULL OUTER JOIN eBayPrices90days ep90days ON ip.MasterSKU = ep90days.MasterSKU
+            FULL OUTER JOIN OnbuyPrices90days op90days ON ip.MasterSKU = op90days.MasterSKU
+			FULL OUTER JOIN ShopifyPrices90days sp90days ON ip.MasterSKU = sp90days.MasterSKU
+        ORDER BY ip.MasterSKU;
+
+END

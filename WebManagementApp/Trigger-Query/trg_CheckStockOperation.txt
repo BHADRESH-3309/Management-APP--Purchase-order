@@ -1,0 +1,66 @@
+CREATE TRIGGER [dbo].[trg_CheckStockOperation]
+ON [dbo].[tblStockLocationHistory]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Declare a table variable to store the results from INSERTED
+    DECLARE @OperationRecords TABLE (
+        idStockLocationHistory UNIQUEIDENTIFIER,
+        idStockLocation UNIQUEIDENTIFIER,
+        MasterSKU NVARCHAR(120),
+        Quantity INT,
+        OperationType NVARCHAR(10),
+		CompanyName NVARCHAR(100)
+    );
+
+    -- Populate the operation records based on inserted data
+    INSERT INTO @OperationRecords (idStockLocationHistory, idStockLocation, MasterSKU, Quantity, OperationType, CompanyName)
+    SELECT 
+        I.idStockLocationHistory,
+        I.idStockLocation,
+        I.MasterSKU,
+        I.Quantity,
+        CASE
+            WHEN I.IsOrderProcessHistory = 1 OR I.ReduceReason IS NOT NULL THEN 'Reduce'
+            WHEN I.IsOrderProcessHistory = 0 THEN 'Add'
+            ELSE 'Issue'
+        END AS OperationType,
+		I.CompanyName
+    FROM INSERTED I;
+
+    -- Log the operations into the tblStockOperationLog table
+    INSERT INTO tblStockOperationLog (idStockLocationHistory, idStockLocation, MasterSKU, OperationType, Quantity, DateLogged, CompanyName)
+    SELECT idStockLocationHistory, idStockLocation, MasterSKU, OperationType, Quantity, GETDATE(), CompanyName
+    FROM @OperationRecords;
+
+    -- Declare variables for iterating through operation records
+    DECLARE @MasterSKU NVARCHAR(120), @Quantity INT, @OperationType NVARCHAR(10), @CompanyName NVARCHAR(100);
+
+    -- Process each operation record
+    WHILE EXISTS (SELECT 1 FROM @OperationRecords)
+    BEGIN
+        -- Retrieve the top record
+        SELECT TOP 1
+            @MasterSKU = MasterSKU,
+            @Quantity = Quantity,
+            @OperationType = OperationType, 
+			@CompanyName = CompanyName
+        FROM @OperationRecords;
+
+        -- Execute the stored procedure based on the operation type
+        IF @OperationType = 'Add'
+        BEGIN
+            EXEC sp_UpdateStockAgingReport @MasterSKU, @Quantity, 'Add', @CompanyName;
+        END
+        ELSE IF @OperationType = 'Reduce'
+        BEGIN
+            EXEC sp_UpdateStockAgingReport @MasterSKU, @Quantity, 'Reduce', @CompanyName;
+        END;
+
+        -- Remove the processed record
+        DELETE FROM @OperationRecords
+        WHERE MasterSKU = @MasterSKU AND Quantity = @Quantity AND OperationType = @OperationType AND CompanyName = @CompanyName;
+    END;
+END;

@@ -1,0 +1,93 @@
+CREATE PROCEDURE [dbo].[sp_UpdateStockAgingReport]
+    @MasterSKU NVARCHAR(120),
+    @Quantity INT,
+    @Operation NVARCHAR(10), -- 'Add' or 'Reduce'
+	@CompanyName NVARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Declare variables
+    DECLARE @CurrentDate DATETIME = GETDATE();
+    DECLARE @RemainingQuantity INT = @Quantity;
+
+    -- Handle stock addition
+    IF @Operation = 'Add'
+    BEGIN
+        -- Insert new stock entry into ledger
+        INSERT INTO tblStockLedger (MasterSKU, Quantity, StockDate, CompanyName)
+        VALUES (@MasterSKU, @Quantity, @CurrentDate, @CompanyName);
+    END
+
+    -- Handle stock reduction
+    ELSE IF @Operation = 'Reduce'
+    BEGIN
+        -- Process reduction starting with the oldest stock
+        WHILE @RemainingQuantity > 0
+        BEGIN
+            -- Fetch the oldest unprocessed stock entry
+            DECLARE @LedgerID INT, @LedgerQuantity INT, @StockDate DATETIME, @LedgerCompany NVARCHAR;
+            SELECT TOP 1
+                @LedgerID = LedgerID,
+                @LedgerQuantity = Quantity,
+                @StockDate = StockDate,
+				@CompanyName = CompanyName
+            FROM tblStockLedger
+            WHERE MasterSKU = @MasterSKU AND IsReduced = 0 AND CompanyName = @CompanyName
+            ORDER BY StockDate;
+
+            -- Exit if no more stock is available
+            IF @LedgerID IS NULL BREAK;
+
+            -- Reduce stock from this ledger entry
+            IF @LedgerQuantity > @RemainingQuantity
+            BEGIN
+                -- Update the ledger with reduced quantity
+                UPDATE tblStockLedger
+                SET Quantity = @LedgerQuantity - @RemainingQuantity
+                WHERE LedgerID = @LedgerID;
+
+                SET @RemainingQuantity = 0; -- Reduction complete
+            END
+            ELSE
+            BEGIN
+                -- Mark the entire ledger entry as reduced
+                UPDATE tblStockLedger
+                SET IsReduced = 1
+                WHERE LedgerID = @LedgerID;
+
+                SET @RemainingQuantity = @RemainingQuantity - @LedgerQuantity;
+            END
+        END
+    END
+
+    -- Calculate aging categories based on the ledger
+    DECLARE @Aging_0_30 INT = 0, @Aging_30_60 INT = 0, @Aging_60_90 INT = 0, @Aging_90_plus INT = 0;
+
+    SELECT 
+        @Aging_0_30 = SUM(CASE WHEN DATEDIFF(DAY, StockDate, @CurrentDate) <= 30 THEN Quantity ELSE 0 END),
+        @Aging_30_60 = SUM(CASE WHEN DATEDIFF(DAY, StockDate, @CurrentDate) BETWEEN 31 AND 60 THEN Quantity ELSE 0 END),
+        @Aging_60_90 = SUM(CASE WHEN DATEDIFF(DAY, StockDate, @CurrentDate) BETWEEN 61 AND 90 THEN Quantity ELSE 0 END),
+        @Aging_90_plus = SUM(CASE WHEN DATEDIFF(DAY, StockDate, @CurrentDate) > 90 THEN Quantity ELSE 0 END)
+    FROM tblStockLedger
+    WHERE MasterSKU = @MasterSKU AND IsReduced = 0 AND CompanyName = @CompanyName;
+
+    -- Update the aging report
+    IF NOT EXISTS (
+        SELECT 1 FROM tblStockAgingReport WHERE MasterSKU = @MasterSKU AND CompanyName = @CompanyName
+    )
+    BEGIN
+        INSERT INTO tblStockAgingReport (MasterSKU, Aging_0_30, Aging_30_60, Aging_60_90, Aging_90_plus, LastUpdated, CompanyName)
+        VALUES (@MasterSKU, @Aging_0_30, @Aging_30_60, @Aging_60_90, @Aging_90_plus, @CurrentDate, @CompanyName);
+    END
+    ELSE
+    BEGIN
+        UPDATE tblStockAgingReport
+        SET Aging_0_30 = @Aging_0_30,
+            Aging_30_60 = @Aging_30_60,
+            Aging_60_90 = @Aging_60_90,
+            Aging_90_plus = @Aging_90_plus,
+            LastUpdated = @CurrentDate
+        WHERE MasterSKU = @MasterSKU AND CompanyName = @CompanyName;
+    END
+END;

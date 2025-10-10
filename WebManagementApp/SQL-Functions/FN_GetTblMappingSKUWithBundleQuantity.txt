@@ -1,0 +1,15 @@
+﻿CREATE FUNCTION [dbo].[FN_GetTblMappingSKUWithBundleQuantity](@CompanyName NVARCHAR(100))
+RETURNS TABLE
+AS
+RETURN (
+	SELECT idMappingSKU, MP.idMasterSKU, SKU, MP.SalesChannel, mp.CompanyName,
+	CASE 
+		WHEN B.idBundle IS NOT NULL
+		THEN B.ReduceQuantity 
+		ELSE 1
+	END
+	AS Quantity
+	FROM tblMappingSKU MP LEFT JOIN tblBundle B ON MP.SKU = B.MarketplaceSKU AND LOWER(MP.SalesChannel) = LOWER(B.SalesChannel)
+	AND MP.idMasterSKU = b.idMasterSKU AND LOWER(MP.CompanyName) = LOWER(b.CompanyName)
+	--WHERE (@CompanyName = 'All' OR LOWER(MP.CompanyName) = LOWER(@CompanyName))
+);

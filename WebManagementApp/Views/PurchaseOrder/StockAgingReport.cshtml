@@ -1,0 +1,225 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Stock Aging Report";
+}
+
+@{
+    var showPOBaseUrl = Url.Action("PurchaseOrder", "PurchaseOrder");
+}
+
+@section Styles
+{
+    <style>
+
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+         @@media screen and (max-width: 760px) {
+            .table-overlay {
+                width: 700px !important;
+            }
+
+            #idCardDropdown{
+                width: 700px !important;
+            }
+        }
+
+        @@media screen and (max-width: 760px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+    </style>
+}
+
+<div class="positionrow">
+    <div class="card">
+        <div class="card-body mb-1" id="idCardDropdown">
+            <label class="col-form-label mt-2" style="font-weight: bold;">Stock Aging Filter</label>
+            <div class="col-sm-3 d-flex" style="min-width:300px">
+                <select class="form-select" id="agingFilter" aria-label="Default select example">
+                    <option selected value="Supplier">Supplier</option>
+                    <option value="PO Number">PO Number</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body mt-2">
+            <!-- Table with stripped rows -->
+            <table id="stockAgingReport-table" class="table">
+            </table>
+
+            <div id="table-loading-spinner" class="table-overlay">
+                <div class="spinner-border" role="status">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts
+{
+    <script type="module">
+        
+        import { DataTable } from "../assets/vendor/simple-datatables/module.js"
+        let _StockAgingDatatable = null;
+        let _StockAgingData = [];
+        let currentFilter = 'Supplier';
+                var showPOBaseUrl = '@showPOBaseUrl';
+
+        $(document).ready(function () {
+            $('#agingFilter').on('change', function () {
+                currentFilter = $(this).val();
+                GenerateStockAgingData();
+            });
+
+            // Functions to get Stock Aging report data.
+            GenerateStockAgingData();
+        })
+
+        /**
+        * Fetches the Stock Rceipt Aging data from the server.
+        */
+        function GenerateStockAgingData() {
+            const selectedFilter = $('#agingFilter').val();
+
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetStockAgingReportData", "PurchaseOrder")",
+                data: { selectedFilter: selectedFilter },
+                dataType: "json",
+                success: function (response) {
+                    if (response.isError) {
+                        GenerateStockAgingTable(response);
+                        toastr.error(response.message);
+                    } else {
+                        GenerateStockAgingTable(response);
+                    }
+
+                    $('#table-loading-spinner').addClass('d-none');
+                },
+                failure: handleAjaxError,
+                error: handleAjaxError
+            });
+        }
+
+        /**
+        * Handles AJAX errors by logging the response text
+        * @@param {Array} result - The AJAX result array
+        */
+        function handleAjaxError(result) {
+            $('#table-loading-spinner').addClass('d-none');
+            console.error(result.responseText);
+        }
+
+        /**
+        * Generates the DataTable for Stock Aging report data.
+        * * @@param {Array} data - The stock data
+        */
+        function GenerateStockAgingTable(response) {
+            if (_StockAgingDatatable) {
+                _StockAgingDatatable.destroy();
+            }
+
+            // Decide label based on dropdown
+            let columnHeader = currentFilter === "Supplier" ? "Supplier Name" : "PO Number";
+
+            _StockAgingData = response.result.map((row, index) => [
+                index + 1,
+                currentFilter === "Supplier" ? (row.supplierName || '') : 
+                    `<p><a href="${showPOBaseUrl}?po=${row.poNumber}" title="Click to Show Purchase Order Details" target="_blank">${row.poNumber}</a></p>`,
+                row.aging_0_30,
+                row.aging_30_60,
+                row.aging_60_90,
+                row.aging_90_plus
+            ]);
+
+            let header = ["#", columnHeader, "0-30 Days", "30-60 Days", "60-90 Days", "90+ Days"]
+
+            _StockAgingDatatable = new DataTable("#stockAgingReport-table", {
+                data: {
+                    headings: header,
+                    data: _StockAgingData
+                },
+                perPage: 20,  // Set the default number of records per page
+                perPageSelect: [20, 40, 60],
+            });
+
+            var searchDiv = document.querySelector(".datatable-search");
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+
+                let excelData = [];
+                if (_StockAgingDatatable.totalPages > 0) {
+                    excelData = _StockAgingDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells.map(cell => cell.text)
+                        )
+                    ).flat();
+                }
+
+                // Export to Excel functionality
+                const combinedArray = [header, ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [2, 3, 4, 5, 6]; // Columns that need to be numbers
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                let fileName = `Stock Aging Report - ${currentFilter}.xlsx`;
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), fileName);
+            };
+            searchDiv.appendChild(button);
+        }
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+    </script>
+}

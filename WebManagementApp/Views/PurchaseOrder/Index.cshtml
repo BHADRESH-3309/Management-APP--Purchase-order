@@ -1,0 +1,842 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+@{
+    ViewData["Title"] = "Create Purchase Order";
+}
+
+@if (ViewData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles
+{
+    <style>
+        .item-name-label {
+            width: 350px!important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+
+        #poFieldsRow.create-mode .supplier-col,
+        #poFieldsRow.create-mode .delivery-col {
+            flex: 0 0 50% !important; /* col-md-6 */
+            max-width: 50% !important;
+        }
+
+        #poFieldsRow.edit-mode .supplier-col,
+        #poFieldsRow.edit-mode .delivery-col {
+            flex: 0 0 50% !important; /* col-md-6 */
+            max-width: 50% !important;
+        }
+
+        @@media screen and (max-width: 550px) {
+            .supplier-col {             
+                margin-bottom: 10px!important;
+            }
+
+            #poFieldsRow.edit-mode .supplier-col,
+            #poFieldsRow.edit-mode .delivery-col {
+                margin-top: 10px !important;
+                margin-bottom: 0px !important;
+                flex: none !important; /* col-md-4 */
+                max-width: none !important;
+            }
+        }
+    </style>
+}
+
+<div class="card">
+    <form asp-controller="PurchaseOrder" asp-action="Index" class="needs-validation" method="post" id="purchaseOrderForm" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="id" value="@Model.idPurchaseOrder" />
+        <div class="card-body">
+            <div class="mb-3 row mt-4 d-flex" id="poFieldsRow">
+                <div class="col-md-4" id="poNumberContainer" style="display: none;">
+                    <label class="form-label" for="poNumber">PO Number*:</label>
+                    <select class="form-select" id="poNumberDropdown" name="PONumber">
+                    </select>
+                    <div class="invalid-feedback">Please select a PO Number.</div>
+                </div>
+
+                <div class="supplier-col col-md-6">
+                    <label class="form-label" for="supplier">Supplier Name*:</label>
+                    <input type="text" class="typeahead_Supplier form-control" id="supplierName" name="SupplierName" 
+                        placeholder="Enter supplier name" required>
+                    <div class="invalid-feedback">Please enter the supplier name.</div>
+                </div>
+
+                <div class="delivery-col col-md-6">
+                    <label class="form-label" for="deliveryDate">Delivery Date*:</label>
+                    <input type="date" class="form-control" id="deliveryDate" name="DeliveryDate" required>
+                    <div class="invalid-feedback">Please select a valid date.</div>
+                </div>
+
+                <div class="col-md-4" id="invoiceUpload" style="display:none;">
+                    <label for="InvoiceFile" class="form-label">Upload Invoice:
+                        <span id="invoiceFileName" class="text-primary"></span>
+                    </label>
+                    <input id="InvoiceFile" name="InvoiceFile" type="file" class="form-control" />
+                </div>
+
+                <div class="currency-col col-md-6 mt-2">
+                    <label class="form-label" for="currency">Currency*:</label>
+                    <input type="text" class="typeahead_Currency form-control" id="currency" name="currency" 
+                        placeholder="Enter Currency" required>
+                    <div class="invalid-feedback">Please enter the currency.</div>
+                </div>
+
+                <div class="currencyRate-col col-md-6 mt-2">
+                    <label class="form-label" for="currencyRate">Exchange Rate*:</label>
+                    <input type="number" class="typeahead_currencyRate form-control" id="currencyRate" name="currencyRate"
+                           placeholder="Enter exchange rate" step="0.01" min="0" required>
+                    <div class="invalid-feedback">Please enter the exchange rate.</div>
+                </div>
+
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Items:</label>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped" id="itemTable">
+                        <thead>
+                            <tr>
+                                <th>GTIN</th>
+                                <th>Master SKU*</th>
+                                <th>Item Name</th>
+                                <th>Brand</th>
+                                <th>Quantity*</th>
+                                <th>Unit Price*</th>
+                                <th>Total Price</th>
+                                <th>Exchange price</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemList"></tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="8">
+                                    <div class="invalid-feedback" id="itemValidation" style="display: none;">Please add at least one item.</div>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-success" onclick="addItem()"><i class="bi bi-plus-square"></i> </button>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="note">Note:</label>
+                <textarea class="form-control" id="note" name="Note" placeholder="Enter Notes for deposit & comments"></textarea>
+                <div class="invalid-feedback">Please enter your notes.</div>
+            </div>
+
+            <div class="mb-2" id="total-po-price" style="text-align: right; font-size: 22px;">
+                <b>Total PO Price: </b><span>0.00</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitButton">Create PO</button>
+            <button type="button" class="btn btn-info editPoBtn" data-pono="1001" onclick="editPurchaseOrder(this)">Edit PO</button>
+            <button type="button" class="btn btn-secondary" id="cancelButton" onclick="createPurchaseOrder()" style="display: none;">Cancel</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+
+        const form = document.getElementById('purchaseOrderForm');
+        const itemTable = document.getElementById('itemList');
+        const itemValidation = document.getElementById('itemValidation');
+        const poDropdown = document.getElementById('poNumberDropdown');
+        let gtinOptions = '';
+        let masterSKUOptions = '';
+        let hasSubmittedOnce = false;
+
+        $(document).ready(function () {
+            // Set default PO number.
+            document.getElementById('poNumberDropdown').value = "";
+
+            loadGTINOptions();
+            loadMasterSKUOptions();
+        });
+
+        function loadGTINOptions() {
+            $.ajax({
+                url: '/PurchaseOrder/GetGTINList',
+                type: 'GET',
+                success: function (data) {
+                    gtinOptions = '<option value="">Select</option>';
+                    data.forEach(function (item) {
+                        gtinOptions += `<option value="${item.gtin}">${item.gtin}</option>`;
+                    });
+                },
+                error: function () {
+                    alert("Failed to load GTIN list.");
+                }
+            });
+        }
+
+        function loadMasterSKUOptions() {
+            $.ajax({
+                url: '/PurchaseOrder/GetMasterSKUList',
+                type: 'GET',
+                success: function (data) {
+                    masterSKUOptions = '<option value="">Select</option>';
+                    data.forEach(function (item) {
+                        masterSKUOptions += `<option value="${item.sku}">${item.sku}</option>`;
+                    });
+                },
+                error: function () {
+                    alert("Failed to load Master SKU list.");
+                }
+            });
+        }    
+
+        // Adds a new item row to the table with input fields and sets values if provided.
+        function addItem(item = null) {
+
+            // Get the current number of rows in the table to determine the new index.
+            const index = itemTable.children.length;
+
+            // Create a new row element.
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                        <td><select class="form-select gtin-select" name="Items[${index}].GTIN" style="width:120px;" required>
+                            ${gtinOptions}</select>
+                            <input type="hidden" name="Items[${index}].IdPurchaseOrderProduct" />
+                        </td>
+                        <td><select class="form-select master-sku-select" name="Items[${index}].MasterSKU" style="width:120px;" required>
+                            ${masterSKUOptions}</select>
+                        </td>
+                        <td><p class="item-name-label" title=""></p><input type="hidden" name="Items[${index}].ItemName" /></td>
+                        <td><span class="brand-label"></span><input type="hidden" name="Items[${index}].Brand" /></td>
+                        <td><input type="text" class="form-control quantity-input" name="Items[${index}].Quantity" 
+                              pattern="[1-9][0-9]*" oninput="isNumber(this)" onkeyup="updateTotalPrice(this)" required></td>
+                        <td><input type="text" class="form-control price-input" name="Items[${index}].Price" 
+                               oninput="isNumberAndDecimal(this)" onkeyup="updateTotalPrice(this)" style="width:125px!important" required></td>
+                        <td><input type="text" class="form-control total-price-input" name="Items[${index}].TotalPrice" 
+                            style="width:125px!important" readonly></td>
+                        <td><input type="text" class="form-control exchangeInput" name="Items[${index}].Exchange" style="width:125px!important"
+                            readonly></td>
+                        <td><button type="button" class="btn btn-danger" onclick="removeItem(this)"><i class="bi bi-trash"></i></button></td>
+                    `;
+            // Append the new row to the item table.
+            itemTable.appendChild(row);
+
+            // If an item exists, fill the row with item values.
+            const gtinSelect = row.querySelector(`[name="Items[${index}].GTIN"]`);
+            const masterSKUSelect = row.querySelector(`[name="Items[${index}].MasterSKU"]`);            
+            const itemNameLabel = row.querySelector('.item-name-label');
+            const itemNameInput = row.querySelector(`[name="Items[${index}].ItemName"]`);
+            const brandLabel = row.querySelector('.brand-label');
+            const brandInput = row.querySelector(`[name="Items[${index}].Brand"]`);
+
+            if (item) {
+                gtinSelect.value = item.gtin;
+                masterSKUSelect.value = item.masterSKU;
+                row.querySelector(`[name="Items[${index}].IdPurchaseOrderProduct"]`).value = item.idPurchaseOrderProduct || "";
+                itemNameLabel.textContent = item.itemName;
+                itemNameInput.value = item.itemName;
+                itemNameLabel.title = item.itemName;
+                brandLabel.textContent = item.brand;
+                brandInput.value = item.brand;
+                row.querySelector(`[name="Items[${index}].Quantity"]`).value = item.quantity;
+                row.querySelector(`[name="Items[${index}].Price"]`).value = item.price;
+                row.querySelector(`[name="Items[${index}].TotalPrice"]`).value = (item.price * item.quantity).toFixed(2);
+                row.querySelector(`[name="Items[${index}].Exchange"]`).value = item.exchange;
+            }
+
+            // Apply Select2 plugin for auto-search on Master SKU dropdown.
+            function initSelect2(element, placeholderText) {
+                $(element).select2({
+                    placeholder: placeholderText
+                });
+            }
+            initSelect2($(row).find('.master-sku-select'), "Select SKU");
+            initSelect2($(row).find('.gtin-select'), "Select GTIN");
+
+            $(masterSKUSelect).on('change', function () {
+                const selectedSKU = this.value;             
+                if (selectedSKU) {'';
+                    fetchItemDetails({ selectedDropdownValue: selectedSKU, type: "Master SKU" }, "Master SKU");
+                } 
+                else {
+                    clearFields();
+                }
+            });
+
+            $(gtinSelect).on('change', function () {
+                const selectedGTIN = this.value;
+                if (selectedGTIN) {
+                    fetchItemDetails({ selectedDropdownValue: selectedGTIN, type: "GTIN" }, "GTIN");
+                } 
+                else {
+                    clearFields();
+                }
+            });
+
+            function fetchItemDetails(data, sourceType) {
+                $.ajax({
+                    url: '/PurchaseOrder/GetMasterSKUDetails',
+                    type: 'GET',
+                    data: data, 
+                    success: function (response) {
+                        if (!response.isError && response.result) {
+                            const r = response.result[0];
+
+                            itemNameLabel.textContent = r.itemName || '';
+                            itemNameLabel.title = r.itemName || '';
+                            itemNameInput.value = r.itemName || '';
+                            brandLabel.textContent = r.brand || '';
+                            brandInput.value = r.brand || '';                            
+
+                            if (sourceType === "Master SKU") {
+                                gtinSelect.value = r.gtin || '';
+                                $(gtinSelect).trigger('change.select2');
+                            } else if (sourceType === "GTIN") {
+                                masterSKUSelect.value = r.masterSKU || '';
+                                $(masterSKUSelect).trigger('change.select2');
+                            }
+
+                            $(masterSKUSelect).next('.select2-container').css({ border: '', borderRadius: '' });
+                            $(gtinSelect).next('.select2-container').css({ border: '', borderRadius: '' });
+
+                        } else {
+                            toastr.error(response.message);
+                            clearFields();
+                        }
+                    },
+                    error: function () {
+                        alert("Failed to fetch item details.");
+                        clearFields();
+                    }
+                });
+            }
+
+            function clearFields() {
+                itemNameLabel.textContent = '';
+                itemNameLabel.title = '';
+                itemNameInput.value = '';
+                brandLabel.textContent = '';
+                brandInput.value = '';
+                masterSKUSelect.value = '';
+                gtinSelect.value = '';
+                $(masterSKUSelect).trigger('change.select2');
+                $(gtinSelect).trigger('change.select2');
+            }
+
+            // Apply validation when adding item after form has been submitted once
+            function validateSelect2(selectElement) {
+                if (!selectElement.value) {
+                    const container = $(selectElement).next('.select2-container')[0];
+                    container.style.border = '1px solid red';
+                    container.style.borderRadius = '4px';
+                }
+            }
+       
+            if (hasSubmittedOnce) {
+                validateSelect2(masterSKUSelect);
+                validateSelect2(gtinSelect);
+            }
+
+            // Update name indexes for all items (to maintain model binding on submit).
+            updateItemIndexes();
+
+            // Hide validation message if previously shown.
+            itemValidation.style.display = 'none';
+
+            //Title hover functions.
+            $(document).on('mouseenter', '.item-name-label', function () {
+                const $this = $(this);
+                if ($this.width() < $this[0].scrollWidth) {
+                    $this.css('white-space', 'normal');
+                }
+            });
+            $(document).on('mouseleave', '.item-name-label', function () {
+                const $this = $(this);
+                $this.css('white-space', 'nowrap');
+            });
+        }
+
+        // Updates the total price for a specific row in the table based on quantity and price inputs.
+        function updateTotalPrice(input) {
+            const row = input.closest('tr');
+            const quantity = parseInt(row.querySelector('.quantity-input').value) || 0;
+            const price = parseFloat(row.querySelector('.price-input').value) || 0;
+            const total = quantity * price;
+            row.querySelector('.total-price-input').value = total.toFixed(2);
+
+            // Function call
+            updateTotalPOPrice();
+
+            const rate = parseFloat($("#currencyRate").val()) || 0;
+            const exchange = total * rate;
+            row.querySelector('.exchangeInput').value = exchange.toFixed(2);
+        }
+
+        // Function to calculate and update the total Purchase Order (PO) price
+        function updateTotalPOPrice() {
+            const totalPriceInputs = document.querySelectorAll('.total-price-input');
+            let sum = 0;
+
+            // Loop through each input element to accumulate the total value
+            totalPriceInputs.forEach(input => {
+                const value = parseFloat(input.value) || 0;
+                sum += value;
+            });
+
+            const formattedSum = sum.toLocaleString('en-GB', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+
+            const totalDiv = document.getElementById('total-po-price');
+            totalDiv.innerHTML = `<strong>Total PO Price:</strong> <span>${formattedSum}</span>`;
+        }
+
+        function updateItemIndexes() {
+            const rows = itemTable.querySelectorAll('tr');
+            rows.forEach((row, index) => {
+                row.querySelectorAll('select, input').forEach(input => {
+                    const name = input.name;
+                    if (name) {
+                        input.name = name.replace(/Items\[\d+\]/, `Items[${index}]`);
+                    }
+                });
+            });
+        }
+
+        function removeItem(button) {
+            const row = button.closest('tr');
+            const poNumber = document.getElementById('poNumberDropdown').value;
+            const selectedProductInput = row.querySelector('input[name*="IdPurchaseOrderProduct"]');
+            const productId = selectedProductInput ? selectedProductInput.value : "";
+
+            if (productId && productId.trim() !== "") {
+
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "You won't be able to revert this!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Yes, delete it!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                       
+                        $.ajax({
+                            type: "POST",
+                            url: "@Url.Action("DeleteProduct", "PurchaseOrder")",
+                            data: { productId: productId },
+                            success: function (response) {
+                                if (response.error) {
+                                    Swal.fire(
+                                        'Error!',
+                                        response.message,
+                                        'error'
+                                    );
+                                } else {
+                                    Swal.fire(
+                                        'Deleted!',
+                                        response.message,
+                                        'success'
+                                    );
+                                    console.log(poNumber)
+                                    GetAndFillPODetails(poNumber);
+                                }
+                            },
+                            error: function (error) {
+                                Swal.fire(
+                                    'Error!',
+                                    'Failed to delete record.',
+                                    'error'
+                                );
+                            }
+                        });
+                    } else if (result.dismiss === Swal.DismissReason.cancel) {
+                        Swal.fire({
+                            title: 'Cancelled',
+                            text: 'Your record is safe :)',
+                            icon: 'error',
+                            customClass: {
+                                confirmButton: 'btn btn-success waves-effect waves-light'
+                            }
+                        });
+                    }
+                });
+            } else {
+                row.remove();
+                updateItemIndexes();
+            }
+        }
+
+        // Show or hide item validation message based on item count.
+        function checkItemValidation() {
+            itemValidation.style.display = (itemTable.children.length === 0) ? 'block' : 'none';           
+        }
+
+        // Form Submit button click event
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            // Validation check function call
+            checkItemValidation();
+
+            // Validate all Master SKU selections.
+            hasSubmittedOnce = true;
+            let isValid = true;
+
+            ['.master-sku-select', '.gtin-select'].forEach(selector => {
+                document.querySelectorAll(selector).forEach(select => {
+                    const container = $(select).next('.select2-container')[0];
+                    if (!select.value) {
+                        container.style.border = '1px solid red';
+                        container.style.borderRadius = '6px';
+                        isValid = false;
+                    } else {
+                        container.style.border = '';
+                    }
+                });
+            });
+
+            // Validate form all fields before submission.
+            if (!isValid || itemTable.children.length === 0 || !form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+
+            // Check if form is in edit-mode, Handle form submit and show response.
+            const formData = new FormData(form);
+            if (document.getElementById('poFieldsRow').classList.contains("edit-mode")) {
+                
+                // include PO number if needed (hidden field or dropdown value)
+                const poNumber = document.getElementById('poNumberDropdown').value;
+                formData.append("poNumber", poNumber);
+
+                // Handle invoice file or existing invoice name
+                const invoiceInput = document.getElementById("InvoiceFile");
+                const invoiceLabel = document.getElementById("invoiceFileName");
+
+                if (invoiceInput.files.length > 0) {
+                    // New file selected
+                    formData.append("InvoiceFile", invoiceInput.files[0]);
+                } else {
+                    // No new file selected, send existing invoice filename if available
+                    const existingInvoice = invoiceLabel.querySelector("a")?.textContent || "";
+                    formData.append("InvoiceName", existingInvoice);
+                }
+
+                fetch('/PurchaseOrder/EditPurchaseOrder', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.isError) {
+                            toastr.success(data.message);
+                            GetAndFillPODetails(poNumber);
+                        } 
+                        else 
+                        {
+                            toastr.error("Failed to update purchase order: " + data.message);
+                        }
+                    })
+                    .catch(err => console.error("Error updating PO:", err));
+
+                form.classList.remove('was-validated');
+            }
+            // Create PO submit event
+            else 
+            {                           
+                fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.isError) {
+                            toastr.success(data.message);
+                            form.reset();
+                            itemTable.innerHTML = '';
+
+                            setTimeout(() => {
+                                location.reload(); 
+                            }, 1000);
+                        } else {
+                            toastr.error("Failed to create purchase order: " + data.message);
+                        }
+                    })
+                    .catch(error => console.error("Error:", error));
+
+                form.classList.remove('was-validated');
+            }       
+        });
+
+        // Method to reset create purchase order page.
+        function createPurchaseOrder() 
+        {
+            document.title = "Create Purchase Order";
+            document.querySelector('.pagetitle h1').textContent = "Create Purchase Order";
+
+            const poFieldsRow = document.getElementById('poFieldsRow');
+            poFieldsRow.classList.remove('edit-mode');
+            poFieldsRow.classList.add('create-mode');
+
+            document.getElementById('poNumberContainer').style.display = 'none';
+            document.getElementById('poNumberDropdown').value = "";
+            document.getElementById('supplierName').value = "";
+            document.getElementById('deliveryDate').value = "";
+            document.getElementById('currency').value = "";
+            document.getElementById('currencyRate').value = "";
+
+            // Clear invoice file input
+            const invoiceInput = document.getElementById("InvoiceFile");
+            invoiceInput.value = "";
+            document.getElementById("invoiceFileName").innerHTML = "";
+
+            document.getElementById('note').value = "";
+            form.classList.remove('was-validated');
+            document.getElementById('submitButton').textContent = "Create PO";
+            document.getElementById('cancelButton').style.display = 'none';
+            document.querySelectorAll('.editPoBtn').forEach(btn => btn.style.display = 'inline-block');
+            itemTable.innerHTML = '';
+            itemValidation.style.display = 'none';
+            document.getElementById('invoiceUpload').style.display = 'none';
+            document.querySelector(".delivery-col").classList.remove("mt-3");
+        }
+
+        // Method to edit purchase order.
+        function editPurchaseOrder(button) {
+
+            document.title = "Edit Purchase Order";
+            document.querySelector('.pagetitle h1').textContent = "Edit Purchase Order";     
+
+            const poFieldsRow = document.getElementById('poFieldsRow');
+            poFieldsRow.classList.remove('create-mode');
+            poFieldsRow.classList.add('edit-mode');
+
+            const poNumber = button.dataset.pono;
+            const poNumberContainer = document.getElementById('poNumberContainer');
+            const poNumberDropdown = document.getElementById('poNumberDropdown');
+            const form = document.getElementById('purchaseOrderForm');
+
+            // Show the PO Number and invoice container
+            poNumberContainer.style.display = 'block';
+            document.getElementById('invoiceUpload').style.display = 'block';
+
+            // Ensure correct layout: 2 fields per row
+            poNumberContainer.classList.add("col-md-6");
+            document.querySelector(".supplier-col").classList.add("col-md-6");
+            document.querySelector(".delivery-col").classList.add("col-md-6", "mt-3");
+            invoiceUpload.classList.add("col-md-6", "mt-3");
+
+            // Load PO numbers dynamically from the server
+            $.ajax({
+                url: '/PurchaseOrder/GetPONumberList',
+                type: 'GET',
+                success: function (data) {
+
+                    data.forEach(function (po) {
+                        const option = document.createElement('option');
+                        option.value = po.poNumber;
+                        option.text = po.poNumber;
+
+                        if (po.poNumber == poNumber) {
+                            option.selected = true;
+                        }
+
+                        poNumberDropdown.appendChild(option);
+                    });
+                },
+                error: function () {
+                    alert("Failed to load PO numbers.");
+                }
+            });
+
+            // Get and load PO details
+            GetAndFillPODetails(poNumber);
+
+            form.classList.remove('was-validated');
+            document.getElementById('submitButton').textContent = "Update PO";
+            document.getElementById('cancelButton').style.display = 'inline-block';
+            button.style.display = "none";
+        }
+
+        // Handle PO Dropdown change
+        poDropdown.addEventListener('change', function () {
+            const selectedPO = this.value;
+
+            // Clear invoice file input each time
+            const invoiceInput = document.getElementById("InvoiceFile");
+            invoiceInput.value = "";
+            document.getElementById("invoiceFileName").innerHTML = "";
+
+            if (!selectedPO) {
+                // Clear form if PO is reset
+                document.getElementById('supplierName').value = "";
+                document.getElementById('deliveryDate').value = "";
+                document.getElementById('note').value = "";
+                document.getElementById('currency').value = "";
+                document.getElementById('currencyRate').value = "";
+                itemTable.innerHTML = '';
+                checkItemValidation();
+                return;
+            }
+
+            // Get and load PO details
+            GetAndFillPODetails(selectedPO);
+            
+        });
+
+        function GetAndFillPODetails(poNumber) {
+            if (!poNumber) {
+
+                // Clear form if PO is reset
+                document.getElementById('supplierName').value = "";
+                document.getElementById('deliveryDate').value = "";
+                document.getElementById('note').value = "";
+                document.getElementById('currency').value = "";
+                document.getElementById('currencyRate').value = "";
+                itemTable.innerHTML = '';
+                checkItemValidation();
+                return;
+            }
+
+            // Now fetch PO data dynamically for the selected PO number
+            $.ajax({
+                url: '/PurchaseOrder/GetPurchaseOrderDetails',
+                type: 'GET',
+                data: { poNumber: poNumber },
+                success: function (response) {
+
+                    if (response.isError || !response.result || response.result.length === 0) {
+                        toastr.error("PO data not found.");
+
+                        // Clear invoice input
+                        const invoiceInput = document.getElementById("InvoiceFile");
+                        invoiceInput.value = "";
+                        document.getElementById("invoiceFileName").innerHTML = "";
+
+                        document.getElementById('supplierName').value = "";
+                        document.getElementById('deliveryDate').value = "";
+                        document.getElementById('note').value = "";
+                        document.getElementById('currency').value = "";
+                        document.getElementById('currencyRate').value = "";
+                        itemTable.innerHTML = '';
+                        checkItemValidation();
+
+                        return;
+                    }
+
+                    const poData = response.result[0]; // Use lowercase based on JSON
+                  
+                    document.getElementById('supplierName').value = poData.supplierName || "";
+
+                    if (poData.deliveryDate) {
+
+                        let parsedDate = new Date(poData.deliveryDate);
+
+                        if (!isNaN(parsedDate)) {
+                            const year = parsedDate.getFullYear();
+                            const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+                            const day = String(parsedDate.getDate()).padStart(2, "0");
+                            const formattedDate = `${year}-${month}-${day}`;
+
+                            document.getElementById("deliveryDate").value = formattedDate;
+                        } else {
+                            document.getElementById("deliveryDate").value = "";
+                        }
+                    } else {
+                        document.getElementById("deliveryDate").value = "";
+                    }
+
+                    if (poData.invoiceName) {
+                        document.getElementById("invoiceFileName").innerHTML =
+                            `<a href="/PurchaseOrderInvoice/${poData.invoiceName}" target="_blank">${poData.invoiceName}</a>`;
+                    }
+                    else {
+                        document.getElementById("invoiceFileName").innerHTML = "";
+                    }
+
+                    document.getElementById('currency').value = poData.currency || "";
+                    document.getElementById('currencyRate').value = poData.currencyRate || "";
+                    document.getElementById('note').value = poData.note || "";
+
+                    itemTable.innerHTML = '';
+
+                    if (Array.isArray(poData.items)) {
+                        poData.items.forEach(item => addItem(item));  
+                    }
+
+                    checkItemValidation();
+                    updateTotalPOPrice();
+                },
+                error: function () {
+                    alert("Failed to load PO details.");
+                }
+            });
+        }
+
+        function isNumber(el) {
+            // Allow only digits, minus, and dot in the box
+            el.value = el.value.replace(/[^0-9.-]/g, '');
+        }
+
+        function isNumberAndDecimal(el) {
+            // Allow digits, one decimal point, and minus sign
+            el.value = el.value.replace(/[^0-9.-]/g, '');
+
+            // Ensure minus sign only at the beginning
+            if (el.value.indexOf('-') > 0) {
+                el.value = '-' + el.value.replace(/-/g, '');
+            }
+
+            // Prevent multiple decimal points
+            let parts = el.value.split('.');
+            if (parts.length > 2) {
+                el.value = parts[0] + '.' + parts[1];
+            }
+
+            // Remove leading zeros unless it's "0." for decimals
+            if (/^0[0-9]/.test(el.value)) {
+                el.value = el.value.replace(/^0+/, '');
+            }
+
+            // Validation: value must be greater than 0
+            if (el.value !== '' && parseFloat(el.value) <= 0) {
+                el.setCustomValidity("Value must be greater than 0");
+            } else {
+                el.setCustomValidity("");
+            }
+        }
+
+        $("#currencyRate").on("input", function () {
+            $("tr").each(function () {
+                const row = $(this);
+                const totalPrice = parseFloat(row.find(".total-price-input").val()) || 0;
+                const rate = parseFloat($("#currencyRate").val()) || 0;
+                const exchange = totalPrice * rate;
+                row.find(".exchangeInput").val(exchange.toFixed(2));
+            });
+        });
+      
+    </script>
+
+}

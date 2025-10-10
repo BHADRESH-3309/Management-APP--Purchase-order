@@ -1,0 +1,127 @@
+﻿@model WebManagementApp.Models.CurrencyRateModelVM
+@{
+    ViewData["Title"] = "Currency Rate";
+}
+@section Styles {
+    <style>
+        @@media (min-width: 768px) {
+            .Update-button {
+                margin-top: 32px;
+                margin-left: 30%;
+            }
+        }
+
+        .Span-Border {
+            border-radius: 0px 5px 5px 0px !important;
+        }
+
+        .code-color {
+            color: blue;
+        }
+    </style>
+}
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+    <script>
+
+        $(document).ready(function () {
+
+            setTimeout(function () {
+                $("#alertMessage").fadeOut();
+        @{
+            if (TempData.ContainsKey("SuccessMessage"))
+            {
+                TempData.Remove("SuccessMessage");
+            }
+            if (TempData.ContainsKey("ErrorMessage"))
+            {
+                TempData.Remove("ErrorMessage");
+            }
+        }}, 3000);
+        })
+
+        function isNumberAndDecimal(evt, element) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            var value = element.value;
+            var dotContains = value.indexOf('.') !== -1;
+            if (dotContains && charCode == 46) {
+                return false;
+            }
+            if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 46) {
+                return false;
+            }
+            return true;
+        }
+
+        // Add a listener for form submission to handle custom validation feedback
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.querySelector('form.needs-validation');
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        }, false);
+    </script>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="alertMessage">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Currency conversion rate</h5>
+
+        <form class="row g-3 needs-validation" style="margin-bottom:5px" asp-action="CurrencyRate" method="post" novalidate>
+            <div class="col-md-3">
+                <label for="validationDefault01" class="form-label">GBP<code class="code-color"> To </code>USD: <span style="color:black">*</span></label>
+                <div class="input-group">
+                    <input type="text" asp-for="USDCurrencyRate" class="form-control " onkeypress="return isNumberAndDecimal(event, this)" aria-describedby="inputGroupPrepend2" required pattern="^([1-9]\d*(\.\d+)?|0\.\d*[1-9]\d*)$">
+                    <span class="input-group-text Span-Border">$</span>
+                    <div class="invalid-feedback">
+                        Please enter a valid USD currency rate.
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="validationDefault02" class="form-label">GBP<code class="code-color"> To </code>INR: <span style="color:black">*</span></label>
+                <div class="input-group">
+                    <input type="text" asp-for="INRCurrencyRate" class="form-control" onkeypress="return isNumberAndDecimal(event, this)" aria-describedby="inputGroupPrepend2" required pattern="^([1-9]\d*(\.\d+)?|0\.\d*[1-9]\d*)$">
+                    <span class="input-group-text Span-Border">₹</span>
+                    <div class="invalid-feedback">
+                        Please enter a valid INR currency rate.
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label for="validationDefaultUsername" class="form-label">GBP<code class="code-color"> To </code>EUR: <span style="color:black">*</span></label>
+                <div class="input-group">
+                    <input type="text" asp-for="EURCurrencyRate" class="form-control" onkeypress="return isNumberAndDecimal(event, this)" aria-describedby="inputGroupPrepend2" required pattern="^([1-9]\d*(\.\d+)?|0\.\d*[1-9]\d*)$">
+                    <span class="input-group-text Span-Border">€</span>
+                    <div class="invalid-feedback">
+                        Please enter a valid EUR currency rate.
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary Update-button" type="submit">
+                    Update
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

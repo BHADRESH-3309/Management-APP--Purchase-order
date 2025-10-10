@@ -1,0 +1,113 @@
+﻿USE [dbManagementApp]
+GO
+
+/****** Object:  StoredProcedure [dbo].[spGetCustomDateDashboardData]    Script Date: 11/02/2025 11:21:21 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [dbo].[spGetCustomDateDashboardDataBySalesChannel]
+	@StartDate DATE = NULL,
+    @EndDate DATE = NULL,
+	@CompanyName NVARCHAR(100),
+	@SalesChannel NVARCHAR(50)
+
+AS
+BEGIN
+
+	SET NOCOUNT ON;
+
+    SELECT 
+	SUM(GrossProfit) AS TotalGrossProfit,
+	SUM(AvgCostPrice * UnitSold) AS TotalCOGS,
+	SUM(Fees * UnitSold) AS TotalExpenses,
+	SUM(Revenue) AS TotalRevenue,	--Total Sales
+	SUM(Sales) AS Sales,
+	SUM(UnitSold) AS UnitsSold,
+	SUM(SalesQty) AS TotalQuantity,  
+   (SUM(Revenue) * 1.2) / SUM(SalesQty) AS TotalSalesPrice ,
+	SUM(Fees * UnitSold) / SUM(UnitSold) AS  TotalFees,
+	(SUM(AvgCostPrice * UnitSold) / NULLIF(SUM(SalesQty), 0)) / MAX(BundleQty) AS TotalAvgCostPrice,
+	(MAX(BundleQty)) as TotalBundleQty
+
+	FROM
+    (SELECT 
+        m.SKU AS MasterSKU, 
+        m.Title,
+        m.Image, s.FulfillmentChannel,sl.AvgCostPrice as CostAvgPrice,
+		m.GTIN ,s.Price As SalesPrice,s.Quantity as SalesQty,mp.BundleQuantity as BundleQty,
+		(COALESCE(sl.AvgCostPrice, 0) *  mp.BundleQuantity) AS AvgCostPrice,
+        b.Brand, 
+        mp.SKU AS MarketplaceSKU, 
+        s.SalesChannel,
+        s.CompanyName,
+		-- Revenue
+        CASE WHEN (COALESCE(sl.AvgCostPrice, 0)) = 0 THEN 0
+        ELSE ((COALESCE(s.Price, 0)/1.2) * SUM(s.Quantity)) END AS Revenue,
+		-- GrossProfit
+		CASE WHEN (COALESCE(sl.AvgCostPrice, 0)) = 0 THEN 0
+		ELSE ((COALESCE(s.Price, 0)/1.2) - (COALESCE(sl.AvgCostPrice, 0) *  mp.BundleQuantity)) * SUM(s.Quantity) END AS GrossProfit,
+		-- Fees
+		CASE 
+			WHEN s.FulfillmentChannel = 'fulfillment-inbound' OR (COALESCE(sl.AvgCostPrice, 0)) = 0 THEN 0
+        ELSE 
+			CASE 
+				WHEN LOWER(s.SalesChannel) = 'amazon' AND LOWER(s.FulfillmentChannel) = 'amazon' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName))
+					THEN CAST(ROUND(AVG(ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)), 2) AS DECIMAL(10, 2))
+				WHEN LOWER(s.SalesChannel) = 'amazon' AND LOWER(s.FulfillmentChannel) = 'merchant' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName))
+					THEN CAST(ROUND(AVG(ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+				WHEN LOWER(s.SalesChannel) = 'ebay' 
+					THEN CAST(ROUND(AVG(ISNULL(s.FinalValueFee, 0) + ISNULL(s.ListingFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+				WHEN LOWER(s.SalesChannel) = 'onbuy'
+					THEN CAST(ROUND(AVG(ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+				WHEN LOWER(s.SalesChannel) = 'shopify' 
+					THEN CAST(ROUND(AVG(ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+				ELSE NULL
+			END
+		END AS Fees,
+        SUM(s.Quantity) AS UnitSold,
+		COUNT(s.Quantity) AS Sales
+    FROM 
+        (SELECT idMasterSKU, SKU, Title, Image, ProductCost, idBrand, GTIN FROM tblMasterSKU) AS m
+    INNER JOIN (SELECT idMappingSKU, idMasterSKU, SKU, SalesChannel, CompanyName, Quantity AS BundleQuantity FROM FN_GetTblMappingSKUWithBundleQuantity()) AS mp 
+        ON m.idMasterSKU = mp.idMasterSKU
+	LEFT JOIN (
+        SELECT mp.SKU, mp.CompanyName, mp.SalesChannel, SUM(COALESCE(sl_inner.AvgCostPrice, 0)) AS AvgCostPrice FROM FN_GetTblMappingSKUWithBundleQuantity() mp
+        INNER JOIN (SELECT idMasterSKU, AvgCostPrice
+            FROM (
+                SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+                       ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+                FROM tblStockLocation
+            ) sl_sub
+            WHERE row_num = 1
+        ) sl_inner ON mp.idMasterSKU = sl_inner.idMasterSKU
+        GROUP BY mp.SKU, mp.CompanyName, mp.SalesChannel
+    ) sl ON mp.SKU = sl.SKU 
+        AND mp.SalesChannel = sl.SalesChannel
+		AND (LOWER(mp.CompanyName) = LOWER(sl.CompanyName)	
+		)
+    LEFT JOIN (SELECT idBrand, Brand FROM tblBrand) AS b 
+        ON m.idBrand = b.idBrand
+    LEFT JOIN (
+				SELECT idSales, MarketplaceSKU, Quantity, Price, FulfillmentChannel, SalesChannel, 
+                  ReferralFee, VariableClosingFee, FBAFees, ListingFee, FinalValueFee, 
+                  TransactionFee, AdvertisingFee, BoostFee, SalesFee, ShippingFee, OrderDate, CompanyName, Source
+               FROM tblSales WHERE (ItemStatus IS NULL OR LOWER(ItemStatus) IN ('', 'shipped', 'unshipped')
+			   )) AS s ON mp.SKU = s.MarketplaceSKU 
+				AND LOWER(mp.SalesChannel) = LOWER(s.SalesChannel) 
+				AND LOWER(mp.CompanyName) = LOWER(s.CompanyName)
+				--AND (LOWER(mp.SalesChannel) != 'amazon' OR LOWER(mp.CompanyName) = LOWER(s.CompanyName))
+				AND CAST(s.OrderDate AS DATE) BETWEEN @StartDate AND @EndDate
+				AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
+				AND (LOWER(@SalesChannel) = 'all' OR LOWER(s.SalesChannel) = LOWER(@SalesChannel))
+    WHERE Quantity > 0 AND (FulfillmentChannel IS NULL OR FulfillmentChannel IN ('merchant', 'amazon'))
+		AND (LOWER(s.SalesChannel) != 'amazon' OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 
+		AND (s.Price IS NOT NULL AND s.Price > 0)
+    GROUP BY 
+        m.SKU, mp.SKU, m.Title, m.Image, s.Quantity,m.GTIN, sl.AvgCostPrice, b.Brand, mp.SalesChannel, mp.BundleQuantity,
+        s.SalesChannel, s.FulfillmentChannel, s.Price, s.CompanyName) AS T 
+
+END
+GO

@@ -1,0 +1,509 @@
+﻿@model WebManagementApp.Models.BundleInputModel
+@{
+    ViewData["Title"] = "Bundle Mapping";
+}
+@{
+    var showSkuBaseUrl = Url.Action("Index", "MasterInventory");
+}
+@{
+    var showTitleBaseUrl = Url.Action("Index", "MappingSKU");
+}
+@section Styles
+{
+    <style>
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        @@media (max-width: 575px) {
+            form .submit-label {
+                display: none !important;
+            }
+        }
+        @@media (max-width: 1610px) {
+            form .inputsize {
+                margin-top:5px;
+                min-width:300px!important;
+            }
+        }     
+
+        @@media (max-width: 697px) {
+            .edit {
+                margin-bottom: 5px;
+            }
+        }
+
+        @@media (max-width: 575px) {
+
+            form .inputsize {
+                margin-top: 20px!important;
+                min-width: 300px !important;
+            }
+
+            .buttonminwidth {
+                margin-top:20px;
+            }
+        }
+
+        @@media screen and (max-width: 555px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+    </style>
+}
+
+
+@if (@ViewBag.SuccessMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show mt-2" id="alertMessage" role="alert">
+        @ViewBag.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+else if (@ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show mt-2" id="alertMessage" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="positionrow">
+    @* <div class="card">
+        <div class="card-body">
+
+            <form asp-controller="MappingSKU" asp-action="Bundle" method="post" class="g-3 needs-validation">
+                <div class="row col-lg-12" style="padding:30px 0 15px 10px">
+                    <div class="col-lg-2 col-sm-6 inputsize" style="min-width:250px">
+                        <label asp-for="MasterSKU" class="form-label"></label>
+                        <input type="text" asp-for="MasterSKU" class="typeahead_mastersku form-control" placeholder="Enter Master SKU" autocomplete="off" required>
+                        <div class="invalid-feedback">
+                            Please enter the master sku.
+                        </div>
+                    </div>
+                   
+                    <div class="col-lg-2 col-sm-6 inputsize" style="min-width:250px">
+                        <label asp-for="SalesChannel" class="form-label"></label>
+                        <select asp-for="SalesChannel" class="form-control" autocomplete="off" required>
+                            <option value="">-- Select --</option>
+                            <option value="amazon Greenwize">Amazon Greenwize</option>
+                            <option value="amazon AVA Supplies">Amazon AVA Supplies</option>
+                            <option value="ebay Greenwize">eBay Greenwize</option>
+                            <option value="onbuy Greenwize">OnBuy Greenwize</option>
+                            <option value="shopify Greenwize">Shopify Greenwize</option>
+                        </select>
+                        <div class="invalid-feedback">
+                            Please select a SalesChannel.
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-sm-6 inputsize" style="min-width:250px;">
+                        <label asp-for="MappingSKU" class="form-label"></label>
+                        <input type="text" asp-for="MappingSKU" class="typeahead_marketplacesku form-control" placeholder="Enter Marketplace SKU" autocomplete="off" required>
+                        <div class="invalid-feedback">
+                            Please enter the marketplace sku.
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-sm-6 inputsize" style="min-width:250px">
+                        <label asp-for="ReduceQuantity" class="form-label"></label>
+                        <input type="text" asp-for="ReduceQuantity" class="form-control" placeholder="Enter Reduce Quantity" pattern="^[1-9]\d*$" required>
+                        <div class="invalid-feedback">
+                            Please enter a valid reduce quantity.
+                        </div>
+                    </div>
+                    <div class="col-lg-2 col-sm-6 buttonminwidth" style="min-width:250px">
+                        <label class="form-label submit-label">&nbsp;</label>
+                        <div class=" text-start ">
+                                <button type="submit" class="btn btn-primary" style="width:82px" id="submit_button">Add</button>
+                                <button type="button" class="btn btn-secondary" id="button_cancel" style="width:82px;display:none">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <input type="text" asp-for="idBundle" class="form-control d-none">
+            </form>
+
+        </div>
+    </div> *@
+
+    <div class="card">
+        <div class="card-body mt-2">
+            <!-- Table with stripped rows -->
+            <table id="bundle_table" class="table">
+            </table>
+
+            <div id="table-loading-spinner" class="table-overlay">
+                <div class="spinner-border" role="status">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script type="module">
+        var showSkuBaseUrl = '@showSkuBaseUrl';
+        var showTitleBaseUrl = '@showTitleBaseUrl';
+        $(document).ready(function () {
+
+            // Functions to get suggestions data
+            // GetMasterSKUSuggestions();
+            // GetAllMarketplaceSKUs();
+
+            setTimeout(function () {
+                $("#alertMessage").fadeOut();
+            }, 5000);
+        })
+
+        // function GetMasterSKUSuggestions() {
+        //     $.ajax({
+        //         type: "GET",
+        //         url: "@Url.Action("GetMSTInventorySku", "InventorySync")",
+        //         dataType: "json",
+        //         success: function (response) {
+        //             $('.typeahead_mastersku').typeahead({
+        //                 source: response
+        //             });
+        //         },
+        //         failure: function (response) {
+        //             console.error(response.responseText);
+        //         },
+        //         error: function (response) {
+        //             console.error(response.responseText);
+        //         }
+        //     });
+        // }
+
+        // function GetAllMarketplaceSKUs() {
+        //     $.ajax({
+        //         type: "GET",
+        //         url: "@Url.Action("GetAllMarketplaceSKUs", "MappingSKU")",
+        //         dataType: "json",
+        //         success: function (response) {
+        //             $('.typeahead_marketplacesku').typeahead({
+        //                 source: response
+        //             });
+        //         },
+        //         failure: function (response) {
+        //             console.error(response.responseText);
+        //         },
+        //         error: function (response) {
+        //             console.error(response.responseText);
+        //         }
+        //     });
+        // }
+
+        // Add a listener for form submission to handle custom validation feedback
+        // document.addEventListener('DOMContentLoaded', function () {
+        //     var form = document.querySelector('form.needs-validation');
+        //     form.addEventListener('submit', function (event) {
+        //         if (!form.checkValidity()) {
+        //             event.preventDefault();
+        //             event.stopPropagation();
+        //         }
+        //         form.classList.add('was-validated');
+        //     }, false);
+        // }, false);
+
+        import { DataTable } from "../assets/vendor/simple-datatables/module.js"
+
+        let _BundleDatatable = null;
+        let _BundleData = [];
+        let _BundleDataObject = [];
+
+        GetBundleData();
+
+        /**
+        * Fetches the Bundle data from the server
+        */
+        function GetBundleData() {
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetBundleData", "MappingSKU")",
+                dataType: "json",
+                success: function (response) {
+                    if (response.error) {
+                        toastr.error(response.message);
+                    } else {
+                        GenerateBundleTable(response.result);
+                    }
+
+                    $('#table-loading-spinner').addClass('d-none');
+                },
+                failure: handleAjaxError,
+                error: handleAjaxError
+            });
+        }
+
+        /**
+        * Handles AJAX errors by logging the response text
+        * @@param {Array} result - The AJAX result array
+        */
+        function handleAjaxError(result) {
+            $('#table-loading-spinner').addClass('d-none');
+            console.error(result.responseText);
+        }
+
+        /**
+        * Generates the DataTable for bundle data
+        * @@param {Array} data - The bundle data
+        */
+        function GenerateBundleTable(data) {
+            if (_BundleDatatable) {
+                _BundleDatatable.destroy();
+            }
+            const marketplaceIcons = {
+                // amazon: `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="18" height="18" viewBox="0 0 48 48">
+                //                 <path fill="#FFB300" d="M39.6,39c-4.2,3.1-10.5,5-15.6,5c-7.3,0-13.8-2.9-18.8-7.4c-0.4-0.4,0-0.8,0.4-0.6c5.4,3.1,11.5,4.9,18.3,4.9c4.6,0,10.4-1,15.1-3C39.7,37.7,40.3,38.5,39.6,39z M41.1,36.9c-0.5-0.7-3.5-0.3-4.8-0.2c-0.4,0-0.5-0.3-0.1-0.6c2.3-1.7,6.2-1.2,6.6-0.6c0.4,0.6-0.1,4.5-2.3,6.3c-0.3,0.3-0.7,0.1-0.5-0.2C40.5,40.4,41.6,37.6,41.1,36.9z"></path><path fill="#37474F" d="M36.9,29.8c-1-1.3-2-2.4-2-4.9v-8.3c0-3.5,0-6.6-2.5-9c-2-1.9-5.3-2.6-7.9-2.6C19,5,14.2,7.2,13,13.4c-0.1,0.7,0.4,1,0.8,1.1l5.1,0.6c0.5,0,0.8-0.5,0.9-1c0.4-2.1,2.1-3.1,4.1-3.1c1.1,0,3.2,0.6,3.2,3v3c-3.2,0-6.6,0-9.4,1.2c-3.3,1.4-5.6,4.3-5.6,8.6c0,5.5,3.4,8.2,7.8,8.2c3.7,0,5.9-0.9,8.8-3.8c0.9,1.4,1.3,2.2,3,3.7c0.4,0.2,0.9,0.2,1.2-0.1l0,0c1-0.9,2.9-2.6,4-3.5C37.4,30.9,37.3,30.3,36.9,29.8z M27,22.1L27,22.1c0,2-0.1,6.9-5,6.9c-3,0-3-3-3-3c0-4.5,4.2-5,8-5V22.1z"></path>
+                //                 </svg>`,
+                amazongreenwize: `<img src="/iconimage/IconAmazonGreenwize.png"/>`,
+                amazonavasupplies: `<img src="/iconimage/IconAmazonAVASupplies.png"/>`,
+                ebaygreenwize: `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="35" height="35" viewBox="0 0 48 48" style="padding-bottom: 3px;">
+                                <path fill="#f44336" d="M6,19c-6.002-0.001-6.029,4.529-5.998,5.704c0,0-0.294,5.296,6.058,5.296c5.458,0,5.726-3.323,5.726-3.323l-2.51,0.005c0,0-0.489,1.831-3.205,1.781C2.579,28.4,2.443,25,2.443,25H12C12,24.999,12.643,19.001,6,19z M2.523,23.515c0,0,0.172-2.965,3.624-2.966c3.44-0.001,3.44,2.966,3.44,2.966H2.523z"></path><path fill="#1976d2" d="M18.825,19c-3.058-0.017-4.374,1.719-4.374,1.719V15H12v15h2.316l0.102-1.735c0,0,1.111,1.735,4.356,1.735c3.246,0,5.809-1.898,5.878-5.416C24.719,21.064,21.884,19.016,18.825,19z M18.264,28.431c-3.862,0.046-3.799-3.888-3.799-3.888s-0.141-3.873,3.793-3.97c3.933-0.097,3.875,4.051,3.875,4.051S22.126,28.384,18.264,28.431z"></path><path fill="#8bc34a" d="M34.437 19L37.243 19 41.349 27.185 45.463 19 48 19 40.573 34 37.859 34 40.009 29.537z"></path><path fill="#ffc107" d="M30.724,19.017c0,0-4.883-0.416-5.544,2.983h2.588c0.132-0.415,0.674-1.469,2.785-1.431c2.484,0.044,2.937,1.003,2.923,2.431c0,0-2.129,0.006-2.84,0.009c-1.28,0.006-5.761,0.345-6.179,2.945c-0.498,3.093,2.399,4.058,4.666,4.045c2.266-0.012,3.559-0.659,4.52-1.818l0.103,1.83L36,30v-6.805C35.936,22.032,36,19.224,30.724,19.017z M29.546,28.511c0,0-2.456,0.003-2.6-1.867c-0.154-1.996,3.778-2.078,3.778-2.078l2.778-0.003C33.501,24.564,33.951,28.567,29.546,28.511z"></path>
+                                </svg>`,
+                onbuygreenwize: `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" style="padding-bottom: 4px;">
+                                <path d="M0 0 C10.56 0 21.12 0 32 0 C32 10.56 32 21.12 32 32 C21.44 32 10.88 32 0 32 C0 21.44 0 10.88 0 0 Z " fill="#3769CD" transform="translate(0,0)"/>
+                                <path d="M0 0 C0.99 1.32 1.98 2.64 3 4 C5.29738569 6.85192706 6.26760483 7.89091987 9.9375 8.4375 C13.29987194 7.95716115 15.24591819 6.94405774 18 5 C18 6.32 18 7.64 18 9 C19.65 9 21.3 9 23 9 C23 6.36 23 3.72 23 1 C23.99 1 24.98 1 26 1 C26 3.64 26 6.28 26 9 C27.65 9 29.3 9 31 9 C31 6.36 31 3.72 31 1 C31.33 1 31.66 1 32 1 C32 6.28 32 11.56 32 17 C21.44 17 10.88 17 0 17 C0 11.39 0 5.78 0 0 Z " fill="#3466CC" transform="translate(0,15)"/>
+                                <path d="M0 0 C3.80484394 0.71340824 5.4511805 1.6388541 8 4.5625 C8.625 8 8.625 8 8 11.5625 C5.55401113 14.94371991 4.10703441 16.33186783 0 17.1875 C-4.0743356 16.33868008 -5.54405875 14.88524404 -8 11.5625 C-8.625 8.5625 -8.625 8.5625 -8 5.5625 C-5.53959272 2.23371368 -4.10389613 0.76948052 0 0 Z " fill="#F2F5FB" transform="translate(10,7.4375)"/>
+                                <path d="M0 0 C1 1 1 1 1.09765625 3.28515625 C1.08605469 4.20167969 1.07445312 5.11820313 1.0625 6.0625 C1.05347656 6.98160156 1.04445313 7.90070312 1.03515625 8.84765625 C1.02355469 9.55792969 1.01195312 10.26820312 1 11 C-0.32 11 -1.64 11 -3 11 C-3 8.36 -3 5.72 -3 3 C-3.99 3 -4.98 3 -6 3 C-6 5.64 -6 8.28 -6 11 C-7.32 11 -8.64 11 -10 11 C-10 7.37 -10 3.74 -10 0 C-5.66473162 -0.86705368 -4.00869538 -1.11352649 0 0 Z " fill="#E8EDF9" transform="translate(29,13)"/>
+                                <path d="M0 0 C1.99954746 -0.04254356 4.00041636 -0.04080783 6 0 C7 1 7 1 7.125 4 C7 7 7 7 6 8 C4.00041636 8.04080783 1.99954746 8.04254356 0 8 C-1.125 2.25 -1.125 2.25 0 0 Z " fill="#3B6CCE" transform="translate(7,12)"/>
+                                <path d="M0 0 C1.67542976 0.28604898 3.34385343 0.61781233 5 1 C5 4.3 5 7.6 5 11 C3.68 11 2.36 11 1 11 C1 8.03 1 5.06 1 2 C0.34 1.67 -0.32 1.34 -1 1 C-0.67 0.67 -0.34 0.34 0 0 Z " fill="#F0F4FB" transform="translate(25,13)"/>
+                                </svg>`,
+                shopifygreenwize: `<svg width="18px" height="18px" viewBox="-18 0 292 292" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid" style="padding-bottom: 4px;">
+                                  <path d="M223.774 57.34c-.201-1.46-1.48-2.268-2.537-2.357-1.055-.088-23.383-1.743-23.383-1.743s-15.507-15.395-17.209-17.099c-1.703-1.703-5.029-1.185-6.32-.805-.19.056-3.388 1.043-8.678 2.68-5.18-14.906-14.322-28.604-30.405-28.604-.444 0-.901.018-1.358.044C129.31 3.407 123.644.779 118.75.779c-37.465 0-55.364 46.835-60.976 70.635-14.558 4.511-24.9 7.718-26.221 8.133-8.126 2.549-8.383 2.805-9.45 10.462C21.3 95.806.038 260.235.038 260.235l165.678 31.042 89.77-19.42S223.973 58.8 223.775 57.34zM156.49 40.848l-14.019 4.339c.005-.988.01-1.96.01-3.023 0-9.264-1.286-16.723-3.349-22.636 8.287 1.04 13.806 10.469 17.358 21.32zm-27.638-19.483c2.304 5.773 3.802 14.058 3.802 25.238 0 .572-.005 1.095-.01 1.624-9.117 2.824-19.024 5.89-28.953 8.966 5.575-21.516 16.025-31.908 25.161-35.828zm-11.131-10.537c1.617 0 3.246.549 4.805 1.622-12.007 5.65-24.877 19.88-30.312 48.297l-22.886 7.088C75.694 46.16 90.81 10.828 117.72 10.828z" fill="#95BF46"/><path d="M221.237 54.983c-1.055-.088-23.383-1.743-23.383-1.743s-15.507-15.395-17.209-17.099c-.637-.634-1.496-.959-2.394-1.099l-12.527 256.233 89.762-19.418S223.972 58.8 223.774 57.34c-.201-1.46-1.48-2.268-2.537-2.357" fill="#5E8E3E"/><path d="M135.242 104.585l-11.069 32.926s-9.698-5.176-21.586-5.176c-17.428 0-18.305 10.937-18.305 13.693 0 15.038 39.2 20.8 39.2 56.024 0 27.713-17.577 45.558-41.277 45.558-28.44 0-42.984-17.7-42.984-17.7l7.615-25.16s14.95 12.835 27.565 12.835c8.243 0 11.596-6.49 11.596-11.232 0-19.616-32.16-20.491-32.16-52.724 0-27.129 19.472-53.382 58.778-53.382 15.145 0 22.627 4.338 22.627 4.338" fill="#FFF"/>
+                                  </svg>`
+            };
+            const idBundleData = data.map(row => [row.idBundle]);
+            _BundleDataObject = data;
+            _BundleData = data.map((row, index) => [index + 1, row.masterSKU, row.title, row.mappingSKU, row.salesChannel, row.reduceQuantity]);
+
+            _BundleDatatable = new DataTable("#bundle_table", {
+                data: {
+                    headings: ["#", "Master SKU", "Title", "Marketplace SKU", "Reduce Quantity"],
+                    //headings: ["#", "Master SKU", "Title", "Marketplace SKU", "Reduce Quantity", "Action"],
+                    data: data.map((row, index) => {
+                        const iconHTML = marketplaceIcons[row.salesChannel.toLowerCase().replace(/\s+/g, '')] || '';
+                        const marketplaceSKUHTML = `${iconHTML} ${row.mappingSKU}`;
+                        const masterSKUHTML = `<p><a href="${showSkuBaseUrl}?sku=${row.masterSKU}" title="Click to Show Master SKU Details" target="_blank"> ${row.masterSKU} </a></p >`;
+                        const titleHTML = `<p><a href="${showTitleBaseUrl}?sku=${row.masterSKU}" title="Click to Show Mapping SKU" target="_blank">${row.title}</a></p>`;
+                        // const buttonsHTML = `
+                        //                         <button class="btn btn-primary mr-2 edit"  title="Edit Bundle Quantity">
+                        //                             <i class="bi bi-pencil-square edit"></i>
+                        //                         </button>
+                        //                         <button class="btn btn-danger delete" title="Remove">
+                        //                             <i class="bi bi-trash delete"></i>
+                        //                         </button>`;
+
+                        const srNoHTML = `<span id="${row.idBundle}">${index + 1}</span>`;
+
+                        return [srNoHTML, masterSKUHTML, titleHTML, marketplaceSKUHTML, row.reduceQuantity
+                            // , buttonsHTML
+                        ];
+                    })
+                },
+                perPage: 20,  // Set the default number of records per page
+                perPageSelect: [20, 40, 60],
+                columns: [
+                    { select: 0, sortable: true },
+                    { select: 1, sortable: true },
+                    { select: 2, sortable: true },
+                    { select: 3, sortable: true }
+                    // ,{ select: 4, sortable: false }
+                ]
+            });
+
+            // _BundleDatatable.dom.addEventListener("click", handleBundleTableClick);
+
+            var searchDiv = document.querySelector(".datatable-search");
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+                let searchIds = [];
+                if (_BundleDatatable.totalPages > 0) {
+                    searchIds = _BundleDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells[0].text // Extract only the first value
+                        )
+                    ).flat();
+                }
+
+                let excelData = _BundleData.filter(record => searchIds.map(Number).includes(record[0]));
+
+                const combinedArray = [["#", "Master SKU", "Title", "Marketplace SKU", "SalesChannel", "Reduce Quantity"], ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [6]; // Columns that need to be numbers
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Bundle records.xlsx');
+            };
+            searchDiv.appendChild(button);
+        }
+
+        // function handleBundleTableClick(event) {
+        //     if (event.target.matches("button.delete") || event.target.matches("i.delete")) {
+        //         event.preventDefault();
+        //         event.stopPropagation();
+
+        //         const idBundle = event.target.closest("tr").querySelectorAll("td span")[0].id;
+        //         if (idBundle == null || idBundle == undefined) {
+        //             toastr.error("Something went wrong with delete event!");
+        //             return;
+        //         }
+        //         DeleteBundle(idBundle)
+        //     }
+        //     else if (event.target.matches("button.edit") || event.target.matches("i.edit")) {
+        //         // On edit click display value on input form
+        //         event.preventDefault();
+        //         event.stopPropagation();
+
+        //         document.getElementById('submit_button').textContent = "Update";
+        //         $('#button_cancel').show();
+
+        //         const idBundle = event.target.closest("tr").querySelectorAll("td span")[0].id;
+
+        //         let selectedRecord = _BundleDataObject.find(bundle => bundle.idBundle === idBundle);
+        //         if (selectedRecord) {
+        //             document.getElementById('MappingSKU').value = selectedRecord.mappingSKU
+        //             document.getElementById('MappingSKU').disabled = true;
+
+        //             const dropdown = document.getElementById("SalesChannel");
+        //             if (Array.from(dropdown.options).some(option => option.value === selectedRecord.salesChannel)) {
+        //                 dropdown.value = selectedRecord.salesChannel;
+        //             }
+        //             document.getElementById('SalesChannel').disabled = true;
+
+        //             document.getElementById('MasterSKU').value = selectedRecord.masterSKU;
+        //             document.getElementById('MasterSKU').disabled = true;
+
+        //             document.getElementById('ReduceQuantity').value = selectedRecord.reduceQuantity
+        //             document.getElementById('idBundle').value = selectedRecord.idBundle
+
+        //             window.scrollTo(0, 0);
+        //         }
+        //     }
+        // }
+
+        //On cancel click
+        // $('#button_cancel').on('click', function () {
+        //     document.getElementById('MappingSKU').value = '';
+        //     document.getElementById('MappingSKU').disabled = false;
+
+        //     const dropdown = document.getElementById("SalesChannel");
+        //     if (Array.from(dropdown.options).some(option => option.value === "")) {
+        //         dropdown.value = "";    
+        //     }
+        //     document.getElementById('SalesChannel').disabled = false;
+
+        //     document.getElementById('MasterSKU').value = '';
+        //     document.getElementById('MasterSKU').disabled = false;
+
+        //     document.getElementById('ReduceQuantity').value = '';
+        //     document.getElementById('idBundle').value = '';
+
+        //     document.getElementById('submit_button').textContent = "Add";
+
+        //     $('#button_cancel').hide();
+        // });
+
+        // Function to delete selected bundle record
+        // function DeleteBundle(idBundle) {
+        //     Swal.fire({
+        //         title: 'Are you sure?',
+        //         text: "You won't be able to revert this!",
+        //         icon: 'warning',
+        //         showCancelButton: true,
+        //         confirmButtonColor: '#3085d6',
+        //         cancelButtonColor: '#d33',
+        //         confirmButtonText: 'Yes, delete it!'
+        //     }).then((result) => {
+        //         if (result.isConfirmed) {
+        //             $.ajax({
+        //                 url: '@Url.Action("RemoveBundleData", "MappingSKU")',
+        //                 type: 'POST',
+        //                 data: { idBundle: idBundle },
+        //                 success: function (response) {
+        //                     if (response.error) {
+        //                         Swal.fire(
+        //                             'Error!',
+        //                             response.message,
+        //                             'error'
+        //                         );
+        //                     } else {
+        //                         Swal.fire(
+        //                             'Deleted!',
+        //                             response.message,
+        //                             'success'
+        //                         );
+
+        //                         //success
+        //                         GenerateBundleTable(response.result);
+        //                     }
+        //                 },
+        //                 error: function (error) {
+        //                     Swal.fire(
+        //                         'Error!',
+        //                         'Failed to delete record.',
+        //                         'error'
+        //                     );
+        //                 }
+        //             });
+        //         } else if (result.dismiss === Swal.DismissReason.cancel) {
+        //             Swal.fire({
+        //                 title: 'Cancelled',
+        //                 text: 'Your record is safe :)',
+        //                 icon: 'error',
+        //                 customClass: {
+        //                     confirmButton: 'btn btn-success waves-effect waves-light'
+        //                 }
+        //             });
+        //         }
+        //     });
+        // }
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+    </script>
+}

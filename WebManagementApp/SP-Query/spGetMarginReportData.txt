@@ -1,0 +1,142 @@
+﻿SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:      chetal
+-- Create date: 04-September-2024
+-- Description: Get margin report data for a specified date range, store name, and brand name
+-- =============================================
+CREATE PROCEDURE dbo.spGetMarginReportData
+    @FromDate DATE,
+    @ToDate DATE,
+    @StoreName NVARCHAR(100), 
+    @BrandName NVARCHAR(100), 
+	@CompanyName NVARCHAR(100) 
+AS
+BEGIN
+
+    SET NOCOUNT ON;
+    SELECT 
+        m.SKU AS MasterSKU, 
+        m.Title,
+        m.Image, 
+		m.GTIN,
+		m.EAN,
+		(COALESCE(sl.TotalAvgCostPrice, 0) *  mp.BundleQuantity) AS AvgCostPrice,
+        b.Brand, 
+        mp.SKU AS MarketplaceSKU, 
+        s.SalesChannel,
+		s.CompanyName,
+        s.Price AS SellingPrice,
+        mp.BundleQuantity as BundleQty,
+        sl.TotalAvgCostPrice as TotalAvgCostPrice,
+		CASE 
+        WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN 0
+        ELSE 
+		CASE 
+			WHEN LOWER(s.SalesChannel) = 'amazon' AND LOWER(s.FulfillmentChannel) = 'amazon' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName))
+				THEN CAST(ROUND(AVG(ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.FBAFees, 0)), 2) AS DECIMAL(10, 2))
+			WHEN LOWER(s.SalesChannel) = 'amazon' AND LOWER(s.FulfillmentChannel) = 'merchant' AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName))
+				THEN CAST(ROUND(AVG(ISNULL(s.ReferralFee, 0) + ISNULL(s.VariableClosingFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+			WHEN LOWER(s.SalesChannel) = 'ebay' 
+				THEN CAST(ROUND(AVG(ISNULL(s.FinalValueFee, 0) + ISNULL(s.ListingFee, 0) + ISNULL(s.TransactionFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+			WHEN LOWER(s.SalesChannel) = 'onbuy'
+				THEN CAST(ROUND(AVG(ISNULL(s.BoostFee, 0) + ISNULL(s.SalesFee, 0) + ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+			WHEN LOWER(s.SalesChannel) = 'shopify' 
+				THEN CAST(ROUND(AVG(ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10, 2))
+			ELSE NULL
+			END
+		END AS Fees,
+        SUM(s.Quantity) AS UnitSold, 
+        CASE 
+			
+            WHEN LOWER(mp.SalesChannel) = 'amazon' THEN 
+				CASE 
+					WHEN LOWER(ai.Source) = 'gb' THEN CONCAT('https://amazon.co.uk/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'fr' THEN CONCAT('https://www.amazon.fr/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'de' THEN CONCAT('https://www.amazon.de/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'it' THEN CONCAT('https://www.amazon.it/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'es' THEN CONCAT('https://www.amazon.es/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'nl' THEN CONCAT('https://www.amazon.nl/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'ie' THEN CONCAT('https://www.amazon.ie/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'be' THEN CONCAT('https://www.amazon.com.be/dp/', ai.ASIN)
+					WHEN LOWER(ai.Source) = 'se' THEN CONCAT('https://www.amazon.se/dp/', ai.ASIN)				
+					ELSE NULL
+				END
+            WHEN LOWER(mp.SalesChannel) = 'ebay' THEN CONCAT('https://www.ebay.com/itm/', ei.ItemId)
+            WHEN LOWER(mp.SalesChannel) = 'onbuy' THEN oi.ProductURL
+            WHEN LOWER(mp.SalesChannel) = 'shopify' THEN CONCAT('https://', @StoreName, '.myshopify.com/products/', si.Handle, '?variant=', si.VariantId)
+            ELSE NULL
+        END AS ProductURL
+    FROM 
+        (SELECT idMasterSKU, SKU, Title, Image, ProductCost, idBrand, GTIN, EAN FROM tblMasterSKU) AS m
+    INNER JOIN (SELECT idMappingSKU, idMasterSKU, SKU, SalesChannel, CompanyName, Quantity AS BundleQuantity FROM FN_GetTblMappingSKUWithBundleQuantity()) AS mp 
+        ON m.idMasterSKU = mp.idMasterSKU
+
+	-- Updated logic: calculate the total AvgCostPrice for each unique combination of MarketplaceSKU, CompanyName, and SalesChannel
+    LEFT JOIN (
+        SELECT mp.SKU, mp.CompanyName, mp.SalesChannel, SUM(COALESCE(sl_inner.AvgCostPrice, 0)) AS TotalAvgCostPrice FROM FN_GetTblMappingSKUWithBundleQuantity() mp
+        INNER JOIN (SELECT idMasterSKU, AvgCostPrice
+            FROM (
+                SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+                       ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+                FROM tblStockLocation
+            ) sl_sub
+            WHERE row_num = 1
+        ) sl_inner ON mp.idMasterSKU = sl_inner.idMasterSKU
+        GROUP BY mp.SKU, mp.CompanyName, mp.SalesChannel
+    ) sl ON mp.SKU = sl.SKU 
+        AND mp.SalesChannel = sl.SalesChannel
+		AND (LOWER(mp.CompanyName) = LOWER(sl.CompanyName)
+		--LOWER(mp.SalesChannel) != 'amazon' OR LOWER(mp.CompanyName) = LOWER(sl.CompanyName)
+		)
+
+	--LEFT JOIN (
+	--		SELECT idMasterSKU, AvgCostPrice
+	--		FROM (
+	--			SELECT idMasterSKU, AvgCostPrice, ModifyTime,
+	--				   ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
+	--			FROM tblStockLocation
+	--			--WHERE LOWER(CompanyName) = LOWER(@CompanyName)
+	--		) sl
+	--		WHERE row_num = 1 -- Selects the latest record based on ModifyTime
+	--) sl ON m.idMasterSKU = sl.idMasterSKU
+
+    LEFT JOIN (SELECT idBrand, Brand FROM tblBrand) AS b 
+        ON m.idBrand = b.idBrand 
+    LEFT JOIN (SELECT SKU, ASIN, CompanyName, Source FROM tblAmazonInventory WHERE Source = 'GB' AND 
+		(LOWER(@CompanyName) = 'all' OR LOWER(CompanyName) = LOWER(@CompanyName))) AS ai 
+        ON mp.SKU = ai.SKU AND LOWER(mp.SalesChannel) = 'amazon' AND LOWER(ai.CompanyName) = LOWER(mp.CompanyName) 
+    LEFT JOIN (SELECT SKU, ItemId FROM tblEbayInventory) AS ei 
+        ON mp.SKU = ei.SKU AND LOWER(mp.SalesChannel) = 'ebay' 
+    LEFT JOIN (SELECT SKU, ProductURL FROM tblOnbuyInventory) AS oi 
+        ON mp.SKU = oi.SKU AND LOWER(mp.SalesChannel) = 'onbuy'
+    LEFT JOIN (SELECT SKU, Handle, VariantId FROM tblShopifyInventory) AS si 
+        ON mp.SKU = si.SKU AND LOWER(mp.SalesChannel) = 'shopify'
+    LEFT JOIN (SELECT 
+                  idSales, MarketplaceSKU, Quantity, Price, FulfillmentChannel, SalesChannel, 
+                  ReferralFee, VariableClosingFee, FBAFees, ListingFee, FinalValueFee, 
+                  TransactionFee, AdvertisingFee, BoostFee, SalesFee, ShippingFee, OrderDate, CompanyName, Source
+               FROM tblSales WHERE (ItemStatus IS NULL OR LOWER(ItemStatus) IN ('', 'shipped', 'unshipped', 'Completed','Dispatched', 'Awaiting Dispatch') 
+			   --AND LOWER(CompanyName) = LOWER(@CompanyName) 
+			   )) AS s 
+        ON mp.SKU = s.MarketplaceSKU 
+        AND LOWER(mp.SalesChannel) = LOWER(s.SalesChannel) 
+		AND (LOWER(mp.CompanyName) = LOWER(s.CompanyName)
+			--LOWER(mp.SalesChannel) != 'amazon'
+			--OR LOWER(mp.CompanyName) = LOWER(s.CompanyName)
+		)
+        AND CAST(s.OrderDate AS DATE) BETWEEN @FromDate AND @ToDate 
+		AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
+    WHERE (@BrandName = 'All' OR LOWER(b.Brand) = LOWER(@BrandName)) -- Apply filter for brand name
+	AND Quantity > 0 AND (FulfillmentChannel IS NULL OR FulfillmentChannel IN ('merchant', 'amazon')) 
+	AND (LOWER(s.SalesChannel) != 'amazon'
+         OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 
+	AND (s.Price IS NOT NULL AND s.Price > 0) -- Ensure only products with positive selling price from tblSales
+    GROUP BY 
+        m.SKU, mp.SKU, m.Title, m.Image, m.GTIN, m.EAN, sl.TotalAvgCostPrice, b.Brand, mp.SalesChannel, mp.BundleQuantity,
+        oi.ProductURL, si.Handle, si.VariantId, ai.ASIN, ei.ItemId, s.SalesChannel, s.FulfillmentChannel, s.Price, 
+		s.CompanyName, ai.Source;
+END
+GO

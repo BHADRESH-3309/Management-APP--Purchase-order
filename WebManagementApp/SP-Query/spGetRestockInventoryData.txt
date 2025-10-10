@@ -1,0 +1,71 @@
+﻿CREATE PROCEDURE spGetRestockInventoryData
+AS
+BEGIN
+
+	-- Author: Dharmil Patel
+	WITH SalesData AS
+		(SELECT
+		  s.idSales ,s.OrderDate ,s.Quantity ,m.Title, m.SKU, m.GTIN, b.Brand, s.CompanyName,
+		  ROW_NUMBER() OVER (PARTITION BY s.idSales ORDER BY s.idSales) AS rn
+		  FROM tblSales s LEFT JOIN tblMappingSKU map ON s.MarketplaceSKU = map.SKU AND LOWER(s.SalesChannel) = LOWER(map.SalesChannel)
+				AND (LOWER(@CompanyName) = 'all' OR 
+				(LOWER(map.SalesChannel) != 'amazon' OR (LOWER(map.SalesChannel) = 'amazon' AND LOWER(map.CompanyName) = LOWER(@CompanyName))))
+		  JOIN tblMasterSKU m ON map.idMasterSKU = m.idMasterSKU
+		  LEFT JOIN tblStockLocation stock ON stock.idMasterSKU = m.idMasterSKU AND (LOWER(@CompanyName) = 'all' OR Lower(stock.CompanyName) = LOWER(@CompanyName))
+		  LEFT JOIN tblBrand b ON m.idBrand = b.idBrand
+		  WHERE (s.ItemStatus IS NULL OR LOWER(s.ItemStatus) IN ('', 'shipped', 'unshipped'))
+		  AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
+		  AND (LOWER(s.SalesChannel) != 'amazon' OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 
+		 ),
+	StockQuantities AS
+		(SELECT
+			m.SKU AS SKU
+		   ,CASE
+			  WHEN SUM(CASE WHEN sl.StockLocation = 'Amersham' AND (LOWER(@CompanyName) = 'all' OR Lower(sl.CompanyName) = LOWER(@CompanyName)) THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+			  ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Amersham' AND (LOWER(@CompanyName) = 'all' OR Lower(sl.CompanyName) = LOWER(@CompanyName)) THEN sl.Quantity ELSE 0 END), 0)
+			END AS AmershamQty
+		   ,CASE
+			  WHEN SUM(CASE WHEN sl.StockLocation = 'Watford' AND (LOWER(@CompanyName) = 'all' OR Lower(sl.CompanyName) = LOWER(@CompanyName)) THEN sl.Quantity ELSE NULL END) IS NULL THEN NULL
+			  ELSE COALESCE(SUM(CASE WHEN sl.StockLocation = 'Watford' AND (LOWER(@CompanyName) = 'all' OR Lower(sl.CompanyName) = LOWER(@CompanyName)) THEN sl.Quantity ELSE 0 END), 0)
+			END AS WatfordQty
+		  FROM tblMastersku m LEFT JOIN tblStockLocation sl ON m.idMasterSKU = sl.idMasterSKU GROUP BY m.SKU
+	 ),
+	 FBAQuantities AS (
+            SELECT 
+                m.sku AS MasterSKU,
+                CASE
+                    WHEN SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN 1 ELSE 0 END) = 0 THEN NULL
+                    ELSE COALESCE(NULLIF(SUM(CASE WHEN ai.FulfillmentBy = 'FBA' THEN ai.Quantity ELSE 0 END), 0), 0)
+                END AS FBA
+            FROM tblMastersku m
+            LEFT JOIN tblMappingsku ms ON m.idMasterSKU = ms.idMasterSKU AND LOWER(ms.SalesChannel) = 'amazon' AND (LOWER(@CompanyName) = 'all' OR LOWER(ms.CompanyName) = LOWER(@CompanyName))
+            LEFT JOIN tblAmazonInventory ai ON ms.sku = ai.sku AND (LOWER(@CompanyName) = 'all' OR Lower(ai.CompanyName) = LOWER(@CompanyName)) 
+            GROUP BY m.sku
+    )
+	SELECT SalesData.SKU, SalesData.Title, StockQuantities.AmershamQty as AmershamQty,
+	StockQuantities.WatfordQty as WatfordQty,fba.FBA as fba
+	 ,CASE
+		WHEN StockQuantities.AmershamQty IS NULL AND StockQuantities.WatfordQty IS NULL AND fba.FBA IS NULL THEN NULL
+		ELSE COALESCE(StockQuantities.AmershamQty, 0) + COALESCE(StockQuantities.WatfordQty, 0) + COALESCE(fba.FBA, 0)
+	  END AS Stock, 
+	  SUM(SalesData.Quantity) AS TotalSalesQuantity,
+	  -- Velocity = Total Units Sold / Time Period (60 days here)
+	  SUM(SalesData.Quantity) / 60.0 AS SalesVelocity,
+	  -- Days Available = Current Stock Level / Sales Velocity
+	  CASE
+		WHEN SUM(SalesData.Quantity) = 0 THEN NULL
+		ELSE (COALESCE(StockQuantities.AmershamQty, 0) + COALESCE(StockQuantities.WatfordQty, 0) + COALESCE(fba.FBA, 0)) / (SUM(SalesData.Quantity) / 60.0)
+	  END AS DaysAvailable,
+	SalesData.GTIN, SalesData.Brand, SalesData.CompanyName
+	FROM SalesData 
+	LEFT JOIN StockQuantities ON SalesData.SKU = StockQuantities.SKU
+	LEFT JOIN FBAQuantities fba ON SalesData.SKU = fba.MasterSKU
+	WHERE rn = 1
+	AND CAST(OrderDate AS DATE) >= DATEADD(DAY, -60, CAST(GETDATE() AS DATE))
+	AND CAST(OrderDate AS DATE) < CAST(GETDATE() AS DATE)
+	GROUP BY SalesData.SKU, SalesData.Title, SalesData.GTIN, SalesData.Brand, StockQuantities.AmershamQty ,StockQuantities.WatfordQty, fba.FBA, SalesData.CompanyName ORDER BY DaysAvailable;
+
+END
+GO
+
+

@@ -152,7 +152,7 @@
             </div>
 
             <button type="submit" class="btn btn-primary" id="submitButton">Create PO</button>
-            <button type="button" class="btn btn-info editPoBtn" data-pono="1001" onclick="editPurchaseOrder(this)">Edit PO</button>
+            <button type="button" class="btn btn-info editPoBtn" data-pono="@ViewData["lastPoNumber"]" onclick="editPurchaseOrder(this)">Edit PO</button>
             <button type="button" class="btn btn-secondary" id="cancelButton" onclick="createPurchaseOrder()" style="display: none;">Cancel</button>
         </div>
     </form>
@@ -353,7 +353,7 @@
        
             if (hasSubmittedOnce) {
                 validateSelect2(masterSKUSelect);
-                validateSelect2(gtinSelect);
+                //validateSelect2(gtinSelect);
             }
 
             // Update name indexes for all items (to maintain model binding on submit).

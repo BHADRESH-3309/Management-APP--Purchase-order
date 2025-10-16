@@ -193,6 +193,7 @@
                             <tr>
                                 <th  data-column="srNo" onclick="sortTable('srNo')"><button class="datatable-sorter">#</button></th>
                                 <th  data-column="poNumber" onclick="sortTable('poNumber')"><button class="datatable-sorter">PO Number</button></th>
+                                <th data-column="status" onclick="sortTable('status')"><button class="datatable-sorter">Status</button></th>
                                 <th  data-column="supplierName" onclick="sortTable('supplierName')"><button class="datatable-sorter">Supplier Name</button></th>
                                 <th  data-column="quantity" onclick="sortTable('quantity')"><button class="datatable-sorter">Total Items</button></th>
                                 <th  data-column="price" onclick="sortTable('price')"><button class="datatable-sorter">Total Cost(£)</button></th>
@@ -200,7 +201,7 @@
                                 <th  data-column="deliveryDate" onclick="sortTable('deliveryDate')"><button class="datatable-sorter th-date">Expected Delivery Date</button></th>
                                 <th  data-column="note" onclick="sortTable('note')"><button class="datatable-sorter th-Note">Note</button></th>
 
-                                <th  data-column="status" onclick="sortTable('status')"><button class="datatable-sorter">Status</button></th>
+                               
 
                                 <th data-column="receivedDate" onclick="sortTable('receivedDate')"><button class="datatable-sorter th-date">Received Date</button></th>
                                 <th data-column="receivedCount" onclick="sortTable('receivedCount')"><button class="datatable-sorter">Received Total Quantity</button></th>
@@ -379,15 +380,16 @@
                     tr.innerHTML = `
                                         <td>${row.srNo}
                                             <input type="hidden" class="idPurchaseOrder" value="${row.idPurchaseOrderProduct}" />
-                                        </td>                                    
-                                        <td>${row.poNumber || ''}</td>
+                                        </td>
+        <td>${row.poNumber || ''}</td>
+                                               <td>${row.status || ''}</td>
                                         <td>${row.supplierName || ''}</td>
                                         <td>${row.quantity || ''}</td>
                                         <td>${row.price}</td>
                                         <td>${row.exchange}</td>
                                         <td>${row.deliveryDate ? formatDateTime(row.deliveryDate) : ''}</td>
                                         <td>${row.note || ''}</td>
-                                        <td>${row.status || ''}</td>
+                                           
                                         <td>${row.receivedDate ? formatDateTime(row.receivedDate) : ''}</td>
                                         <td>${row.receivedCount || ''}</td>
                                                                                         <td>

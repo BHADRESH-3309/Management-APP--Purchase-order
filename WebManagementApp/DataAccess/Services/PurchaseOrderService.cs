@@ -40,6 +40,17 @@ namespace WebManagementApp.DataAccess.Services
 
             return masterSKUList;
         }
+        public string GetLastPoNumber()
+        {
+            string rtn = "";
+
+            string existingmasterSKUListQuery = string.Empty;
+            existingmasterSKUListQuery = $@"SELECT TOP 1 PONumber FROM tblPurchaseOrder ORDER by PONumber DESC";
+
+            rtn = _db.GetData<string, dynamic>(existingmasterSKUListQuery, new { }).GetAwaiter().GetResult().FirstOrDefault();
+
+            return rtn;
+        }
 
         // for return dropdown GTIN list.
         public List<GTINList> GetGTINList()
@@ -47,7 +58,7 @@ namespace WebManagementApp.DataAccess.Services
             List<GTINList> gtinList = new List<GTINList>();
 
             string existingGTINListQuery = string.Empty;
-            existingGTINListQuery = $@"select idMasterSKU, GTIN from tblMasterSKU";
+            existingGTINListQuery = $@"select idMasterSKU, ISNULL(GTIN,'') AS GTIN from tblMasterSKU";
 
             gtinList = _db.GetData<GTINList, dynamic>(existingGTINListQuery, new { }).GetAwaiter().GetResult().ToList();
 
@@ -417,12 +428,13 @@ namespace WebManagementApp.DataAccess.Services
                 po.PONumber, 
                 po.SupplierName,   
                 pop.Status,
-                SUM(pop.Quantity) AS quantity,
+               SUM (pop.Quantity) AS quantity,
                 SUM(pop.Quantity * pop.Price) AS Price,
                 SUM(pop.Exchange) AS Exchange,
                 po.DeliveryDate,
-                SUM(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount, 
-                MAX(pop.ReceivedDate) AS ReceivedDate,
+				--m.idMasterSKU,
+                --(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount, 
+                (pop.ReceivedDate) AS ReceivedDate,
                 po.Note,
                 po.InvoiceName,
                 po.DateAdd
@@ -431,16 +443,16 @@ namespace WebManagementApp.DataAccess.Services
                 tblPurchaseOrder po 
                 INNER JOIN tblPurchaseOrderProduct pop ON po.idPurchaseOrder = pop.idPurchaseOrder 
                 INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU 
-                LEFT JOIN tblStockLocation sl ON sl.idMasterSKU = m.idMasterSKU OUTER APPLY (
-                SELECT 
-                    SUM(
-                    ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)
-                    ) AS ReceivedCount 
-                FROM 
-                    tblPurchaseOrderProductHistory poph 
-                WHERE 
-                    poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
-                ) t 
+                --LEFT JOIN tblStockLocation sl ON sl.idMasterSKU = m.idMasterSKU OUTER APPLY (
+                --SELECT 
+                --    SUM(
+                --    ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)
+                --    ) AS ReceivedCount 
+                --FROM 
+                --    tblPurchaseOrderProductHistory poph 
+                --WHERE 
+                --    poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
+                --) t 
                 ";
 
 
@@ -491,6 +503,7 @@ namespace WebManagementApp.DataAccess.Services
                 po.SupplierName,
                 pop.[Status],
                 po.DeliveryDate, 
+pop.ReceivedDate,
                 po.Note, 
                 po.InvoiceName,
                 po.DateAdd

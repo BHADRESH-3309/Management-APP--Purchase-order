@@ -35,8 +35,9 @@ namespace WebManagementApp.Models
 
         public string? Currency { get; set; }
 
+        [Required(ErrorMessage = "Currency Rate is required")]
+        [Range(typeof(decimal), "0.00000001", "99999999.99999999", ErrorMessage = "Please enter a valid exchange rate up to 8 decimal places.")]
         public decimal CurrencyRate { get; set; }
-
         public decimal Exchange { get; set; }
 
         /* Update PO fields */

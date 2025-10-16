@@ -146,7 +146,8 @@
             </div>
 
             <!-- PO Brand Dropdown -->
-            <div style="margin-left: 110px;">
+
+          @*   <div style="margin-left: 110px;">
                 <label class="col-form-label mt-2" style="font-weight: bold;">Brand Name</label>
                 <div class="col-sm-3 d-flex brandDropdown" style="min-width:300px">
                     @if (Model.brandNamelist != null)
@@ -159,7 +160,7 @@
                         @Html.DropDownList("brandName", new List<SelectListItem> { }, "All", new { @class = "form-control" })
                     }
                 </div>
-            </div>
+            </div>  *@
         </div>
     </div>
 
@@ -190,36 +191,25 @@
                     <table id="dataTable" class="table datatable-table">
                         <thead>
                             <tr>
-                                <th rowspan="2" data-column="srNo" onclick="sortTable('srNo')"><button class="datatable-sorter">#</button></th>
-                                <th rowspan="2" data-column="poNumber" onclick="sortTable('poNumber')"><button class="datatable-sorter">PO Number</button></th>
-                                <th rowspan="2" data-column="masterSKU" onclick="sortTable('masterSKU')"><button class="datatable-sorter th-SKU">Mst SKU</button></th>
-                                <th rowspan="2" data-column="itemName" onclick="sortTable('itemName')"><button class="datatable-sorter th-title">Item Name</button></th>
-                                <th rowspan="2" data-column="brand" onclick="sortTable('brand')"><button class="datatable-sorter th-title">Brand</button></th>
-                                <th rowspan="2" data-column="supplierName" onclick="sortTable('supplierName')"><button class="datatable-sorter">Supplier Name</button></th>
-                                <th rowspan="2" data-column="quantity" onclick="sortTable('quantity')"><button class="datatable-sorter">Total Items</button></th>
-                                <th rowspan="2" data-column="price" onclick="sortTable('price')"><button class="datatable-sorter">Total Cost(£)</button></th>
-                                <th rowspan="2" data-column="currency" onclick="sortTable('currency')"><button class="datatable-sorter">Currency</button></th>
-                                <th rowspan="2" data-column="exchange" onclick="sortTable('exchange')"><button class="datatable-sorter">Exchange(£)</button></th>
-                                <th rowspan="2" data-column="deliveryDate" onclick="sortTable('deliveryDate')"><button class="datatable-sorter th-date">Expected Delivery Date</button></th>
-                                <th rowspan="2" data-column="note" onclick="sortTable('note')"><button class="datatable-sorter th-Note">Note</button></th>
+                                <th  data-column="srNo" onclick="sortTable('srNo')"><button class="datatable-sorter">#</button></th>
+                                <th  data-column="poNumber" onclick="sortTable('poNumber')"><button class="datatable-sorter">PO Number</button></th>
+                                <th  data-column="supplierName" onclick="sortTable('supplierName')"><button class="datatable-sorter">Supplier Name</button></th>
+                                <th  data-column="quantity" onclick="sortTable('quantity')"><button class="datatable-sorter">Total Items</button></th>
+                                <th  data-column="price" onclick="sortTable('price')"><button class="datatable-sorter">Total Cost(£)</button></th>
+                                <th  data-column="exchange" onclick="sortTable('exchange')"><button class="datatable-sorter">Exchange(£)</button></th>
+                                <th  data-column="deliveryDate" onclick="sortTable('deliveryDate')"><button class="datatable-sorter th-date">Expected Delivery Date</button></th>
+                                <th  data-column="note" onclick="sortTable('note')"><button class="datatable-sorter th-Note">Note</button></th>
 
-                                <th rowspan="2" data-column="status" onclick="sortTable('status')"><button class="datatable-sorter">Status</button></th>
-                                <th rowspan="2" data-column="receivedDate" onclick="sortTable('receivedDate')"><button class="datatable-sorter th-date">Received Date</button></th>
-                                <th rowspan="2" data-column="receivedCount" onclick="sortTable('receivedCount')"><button class="datatable-sorter">Received Total Quantity</button></th>
-                                <th rowspan="2" data-column="damageCount" onclick="sortTable('damageCount')"><button class="datatable-sorter">Damage Count</button></th>
-                                <th rowspan="2" data-column="missingCount" onclick="sortTable('missingCount')"><button class="datatable-sorter">Missing Count</button></th>
+                                <th  data-column="status" onclick="sortTable('status')"><button class="datatable-sorter">Status</button></th>
 
-                                <th class="colspan-textalign" colspan="3">Quantity</th>
+                                <th data-column="receivedDate" onclick="sortTable('receivedDate')"><button class="datatable-sorter th-date">Received Date</button></th>
+                                <th data-column="receivedCount" onclick="sortTable('receivedCount')"><button class="datatable-sorter">Received Total Quantity</button></th>
 
-                                <th rowspan="2" data-column="issueDescription" onclick="sortTable('issueDescription')"><button class="datatable-sorter th-issue">Issue Description</button></th>
-                                <th rowspan="2" data-column="invoiceName" onclick="sortTable('invoiceName')"><button class="datatable-sorter">Invoice Name</button></th>
-                                <th rowspan="2" data-column="action">Action</th>
+                               
+                                <th  data-column="invoiceName" onclick="sortTable('invoiceName')"><button class="datatable-sorter">Invoice Name</button></th>
+                                <th  data-column="action">Action</th>
                             </tr>
-                            <tr>
-                                <th data-column="amershamQty" onclick="sortTable('amershamQty')"><button class="datatable-sorter">Amersham</button></th>
-                                <th data-column="watfordQty" onclick="sortTable('watfordQty')"><button class="datatable-sorter">Watford</button></th>
-                                <th data-column="totalQty" onclick="sortTable('totalQty')"><button class="datatable-sorter">Total</button></th>
-                            </tr>
+                           
                         </thead>
                         <tbody id="tableBody">
                         </tbody>
@@ -274,7 +264,9 @@
                 }}, 3000);
         })
 
-        $('#status, #supplierName, #brandName, #poNumber').change(function () {
+    //  $('#status, #supplierName, #brandName, #poNumber').change(function () {
+        $('#status, #supplierName, #poNumber').change(function () {
+
             GetPurchaseOrder();
         });
 
@@ -284,7 +276,7 @@
             // Get selected values from dropdowns
             var status = $('#status').val();
             var supplierName = $('#supplierName option:selected').text();
-            var brand = $('#brandName option:selected').text();
+            // var brand = $('#brandName option:selected').text();
             var poNumber = $('#poNumber option:selected').text();
 
             // Show spinner 
@@ -296,7 +288,7 @@
                 data: {
                     status: status,
                     supplierName: supplierName,
-                    brand: brand,
+                    // brand: brand,
                     poNumber : poNumber,
                     selectedPO: selectedPO
                 },
@@ -389,28 +381,22 @@
                                             <input type="hidden" class="idPurchaseOrder" value="${row.idPurchaseOrderProduct}" />
                                         </td>                                    
                                         <td>${row.poNumber || ''}</td>
-                                        <td><p class="title"><a href="${showSkuBaseUrl}?sku=${row.masterSKU}" title = "Click to Show Master SKU Details" target = "_blank" > ${ row.masterSKU }</a></p></td>
-                                        <td class="itemName"><p><a href="${showTitleBaseUrl}?sku=${row.masterSKU}" title="Click to Show Mapping SKU" target="_blank">${row.itemName || ''}</a></p></td>                                      
-                                        <td>${row.brand || ''}</td>
                                         <td>${row.supplierName || ''}</td>
                                         <td>${row.quantity || ''}</td>
                                         <td>${row.price}</td>
-                                        <td>${row.currency || ''}</td>
                                         <td>${row.exchange}</td>
                                         <td>${row.deliveryDate ? formatDateTime(row.deliveryDate) : ''}</td>
                                         <td>${row.note || ''}</td>
                                         <td>${row.status || ''}</td>
                                         <td>${row.receivedDate ? formatDateTime(row.receivedDate) : ''}</td>
                                         <td>${row.receivedCount || ''}</td>
-                                        <td>${row.damageCount || ''}</td>
-                                        <td>${row.missingCount || ''}</td>
-                                       
-                                        <td>${row.amershamQty || ''}</td>
-                                        <td>${row.watfordQty || ''}</td>
-                                        <td>${row.totalQty || ''}</td>
-                                        
-                                        <td>${row.issueDescription || ''}</td>
-                                        <td>${row.invoiceName || ''}</td>
+                                                                                        <td>
+          ${row.invoiceName
+            ? `<a href="/PurchaseOrderInvoice/${row.invoiceName}" download="${row.invoiceName}" target="_blank">
+                 ${row.invoiceName}
+               </a>`
+            : ''}
+        </td>
                                         <td>
                                             <div class="btn-group" role="group" aria-label="PO Actions">
                                              <a href="${editPurchaseOrderUrl}?id=${row.idPurchaseOrderProduct}" class="btn btn-primary btnEdit"

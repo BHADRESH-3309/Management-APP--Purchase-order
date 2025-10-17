@@ -5,7 +5,7 @@
 }
 
 @{
-    var editPurchaseOrderUrl = Url.Action("UpdatePurchaseOrder", "PurchaseOrder");
+    var editPurchaseOrderUrl = Url.Action("UpdatePurchaseOrderDemo", "PurchaseOrder");
 }
 
 @{
@@ -379,7 +379,7 @@
                 
                     tr.innerHTML = `
                                         <td>${row.srNo}
-                                            <input type="hidden" class="idPurchaseOrder" value="${row.idPurchaseOrderProduct}" />
+                                                <input type="hidden" class="idPurchaseOrder" value="${row.idPurchaseOrder}" />
                                         </td>
         <td>${row.poNumber || ''}</td>
                                                <td>${row.status || ''}</td>
@@ -401,8 +401,8 @@
         </td>
                                         <td>
                                             <div class="btn-group" role="group" aria-label="PO Actions">
-                                             <a href="${editPurchaseOrderUrl}?id=${row.idPurchaseOrderProduct}" class="btn btn-primary btnEdit"
-                                             data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit Purchase Order" target="_blank">
+                                                 <a href="${editPurchaseOrderUrl}?id=${row.idPurchaseOrder}" class="btn btn-primary btnEdit"
+                                             data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit Purchase Order" >
                                             <i class="bi bi-pencil-square"></i></a>
                                             </div>
                                         </td>`;

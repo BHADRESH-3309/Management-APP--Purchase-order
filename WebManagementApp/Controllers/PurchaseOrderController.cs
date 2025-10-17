@@ -353,20 +353,36 @@ namespace WebManagementApp.Controllers
         /* Stock Aging Report page - End */
 
 
-        //[HttpGet]
-        //public ActionResult UpdatePurchaseOrderDemo()
-        //{
-        //    var model = new PurchaseOrderModel();
-        //    try
-        //    {
-        //       // model = _purchaseOrderService.GetUpdatePOItemDetails(id);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        ViewData["ErrorMessage"] = ex.Message;
-        //    }
-        //    return View(model);
-        //}
+        [HttpGet]
+        public ActionResult UpdatePurchaseOrderDemo(string id)
+        {
+            var model = new PurchaseOrderModel();
+            try
+            {
+                model = _purchaseOrderService.GetPurchaseOrderDetailsList(id).Result;
+            }
+            catch (Exception ex)
+            {
+            }
+            return View(model);
+        }
+
+        [HttpPost]
+        public ActionResult UpdatePurchaseOrderDemo(PurchaseOrderModel model)
+        {
+            string userName = HttpContext.Session.GetString("Email");
+            try
+            {
+                 _purchaseOrderService.UpdatePurchaseOrderList(model, userName);
+                TempData["SuccessMessage"] = "Purchase Order updated successfully!";
+                return RedirectToAction("PurchaseOrder");
+            }
+            catch (Exception ex)
+            {
+                ViewData["ErrorMessage"] = ex.Message;
+                return View(model);
+            }
+        }
 
     }
 }

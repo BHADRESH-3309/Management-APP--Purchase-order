@@ -424,35 +424,36 @@ namespace WebManagementApp.DataAccess.Services
             {
                 string query = @"
                 SELECT 
-                po.idPurchaseOrder, 
-                po.PONumber, 
-                po.SupplierName,   
-                pop.Status,
-               SUM (pop.Quantity) AS quantity,
-                SUM(pop.Quantity * pop.Price) AS Price,
-                SUM(pop.Exchange) AS Exchange,
-                po.DeliveryDate,
-				--m.idMasterSKU,
-                --(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount, 
-                (pop.ReceivedDate) AS ReceivedDate,
-                po.Note,
-                po.InvoiceName,
-                po.DateAdd
-   
-                FROM 
-                tblPurchaseOrder po 
-                INNER JOIN tblPurchaseOrderProduct pop ON po.idPurchaseOrder = pop.idPurchaseOrder 
-                INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU 
-                --LEFT JOIN tblStockLocation sl ON sl.idMasterSKU = m.idMasterSKU OUTER APPLY (
-                --SELECT 
-                --    SUM(
-                --    ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)
-                --    ) AS ReceivedCount 
-                --FROM 
-                --    tblPurchaseOrderProductHistory poph 
-                --WHERE 
-                --    poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
-                --) t 
+    po.idPurchaseOrder, 
+    po.PONumber, 
+    po.SupplierName,   
+    ISNULL(po.Status,'Created') as [Status],
+    SUM(pop.Quantity) AS Quantity,
+    SUM(pop.Quantity * pop.Price) AS Price,
+    SUM(pop.Exchange) AS Exchange,
+    SUM(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount,
+    po.DeliveryDate,
+    po.ReceivedDate,
+    po.Note,
+    po.InvoiceName,
+    po.DateAdd   
+FROM 
+    tblPurchaseOrder po 
+    INNER JOIN tblPurchaseOrderProduct pop 
+        ON po.idPurchaseOrder = pop.idPurchaseOrder  
+    OUTER APPLY (
+        SELECT 
+            SUM(
+                ISNULL(DamageCount, 0) + 
+                ISNULL(MissingCount, 0) + 
+                ISNULL(AmershamQuantity, 0) + 
+                ISNULL(WatfordQuantity, 0)
+            ) AS ReceivedCount 
+        FROM 
+            tblPurchaseOrderProductHistory poph 
+        WHERE 
+            poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
+    ) t  
                 ";
 
 
@@ -498,16 +499,17 @@ namespace WebManagementApp.DataAccess.Services
 
                 query = query + @"
                 GROUP BY 
-                po.idPurchaseOrder, 
-                po.PONumber,
-                po.SupplierName,
-                pop.[Status],
-                po.DeliveryDate, 
-pop.ReceivedDate,
-                po.Note, 
-                po.InvoiceName,
-                po.DateAdd
-                ORDER BY po.DateAdd DESC";
+    po.idPurchaseOrder, 
+    po.PONumber,
+    po.SupplierName,
+    po.Status,
+    po.DeliveryDate, 
+    po.ReceivedDate,
+    po.Note, 
+    po.InvoiceName,
+    po.DateAdd
+ORDER BY 
+    po.DateAdd DESC";
 
                 var result = await _db.GetData<PurchaseOrderModel, dynamic>(query, new { });
                 response.Result = result;
@@ -1006,5 +1008,121 @@ pop.ReceivedDate,
             return response;
         }
         /* Stock aging report page - End */
+
+
+        // Retrieve Purchase order details.
+        public async Task<PurchaseOrderModel> GetPurchaseOrderDetailsList(string id)
+        {
+            PurchaseOrderModel response = new PurchaseOrderModel();
+            try
+            {
+                if (!string.IsNullOrEmpty(id))
+                {
+                    string purchaseOrderDetailsQuery = @"SELECT idPurchaseOrder,PONumber, SupplierName, DeliveryDate, Note, 
+                        InvoiceName, Currency, CurrencyRate,ISNULL([Status],'Created') AS  [Status], ISNULL(ReceivedDate,GETDATE()) AS ReceivedDate FROM tblPurchaseOrder WHERE idPurchaseOrder = @id";
+
+                    var purchaseOrderList = await _db.GetData<PurchaseOrderModel, dynamic>(purchaseOrderDetailsQuery,
+                                            new { id });
+                    response = purchaseOrderList.FirstOrDefault();
+
+                    
+
+                    if (response?.idPurchaseOrder != Guid.Empty)
+                    {
+                        // Get product details
+                        string itemsQuery = @"SELECT 
+	pop.idPurchaseOrderProduct,
+	pop.idPurchaseOrder, 
+	pop.GTIN,
+	pop.MasterSKU,
+	pop.ItemName,
+	pop.Quantity,
+	t.ReceivedCount,
+	pop.AmershamQuantity,
+	pop.WatfordQuantity,
+	pop.DamageCount, 
+	pop.MissingCount, 
+	pop.IssueDescription 
+	FROM
+	tblPurchaseOrderProduct pop 
+    INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU and pop.idPurchaseOrder = @idPurchaseOrder
+        OUTER APPLY (
+    SELECT 
+        SUM(
+        ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)
+        ) AS ReceivedCount 
+    FROM 
+        tblPurchaseOrderProductHistory poph 
+    WHERE 
+        poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
+    ) t  ";
+
+                        var items = await _db.GetData<PurchaseOrderItemListModel, dynamic>(itemsQuery,
+                            new { idPurchaseOrder = response?.idPurchaseOrder });
+
+                        response.ItemsList = items.ToList();
+                    }
+                  
+                }
+            }
+            catch (Exception ex)
+            {
+                
+            }
+            return response;
+        }
+
+        public PurchaseOrderModel UpdatePurchaseOrderList(PurchaseOrderModel model, string userName)
+        {
+
+
+            if (model.idPurchaseOrder != Guid.Empty && model.ItemsList != null && model.ItemsList.Count > 0)
+            {
+                /* Update Purchase Order  */
+                string updatePOQuery = string.Empty;
+                updatePOQuery = @"UPDATE tblPurchaseOrder SET Status = @status, ReceivedDate = @receivedDate,
+                                ModifyDate = GETDATE() WHERE idPurchaseOrder = @idPurchaseOrder ";
+                _db.ExecuteDML(updatePOQuery, new
+                {
+                    status = model.Status,
+                    receivedDate = model.ReceivedDate,
+                    idPurchaseOrder = model.idPurchaseOrder
+                }).GetAwaiter().GetResult();
+
+                /* Update Purchase Order List */
+                foreach (var item in model.ItemsList)
+                {
+                    string query = string.Empty;
+
+                    query = @"UPDATE tblPurchaseOrderProduct SET ReceivedDate = @receivedDate, 
+                    MissingCount = @missingCount, DamageCount = @damageCount, IssueDescription = @issueDescription,
+                    AmershamQuantity = @amershamQuantity, WatfordQuantity = @watfordQuantity,
+                    ModifyDate = GetDate() WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct";
+                    _db.ExecuteDML(query, new
+                    {
+                        idPurchaseOrderProduct = item.idPurchaseOrderProduct,
+                        status = model.Status,
+                        receivedDate = model.ReceivedDate,
+                        missingCount = item.MissingCount,
+                        damageCount = item.DamageCount,
+                        issueDescription = item.IssueDescription,
+                        amershamQuantity = item.AmershamQuantity,
+                        watfordQuantity = item.WatfordQuantity
+                    });
+
+                    // Function call
+                    if (item.AmershamQuantity != null || item.WatfordQuantity != null)
+                    {
+                        AddWarehouseQuantity(item.MasterSKU, item.AmershamQuantity.ToString(), item.WatfordQuantity.ToString(), userName).GetAwaiter().GetResult();
+                    }
+
+                    InsertPurchaseOrderProductHistory(item.idPurchaseOrderProduct, item.MasterSKU, item.Quantity,
+                         model.Status, model.ReceivedDate, item.DamageCount, item.MissingCount, item.IssueDescription,
+                         item.AmershamQuantity.ToString(), item.WatfordQuantity.ToString()).GetAwaiter().GetResult();
+                }
+            }
+            return model;
+        }
+
     }
 }

@@ -99,6 +99,7 @@ namespace WebManagementApp.Models
         public List<MasterSKUList> masterSKUList { get; set; }
         public List<PONumberList> poNumberList { get; set; }
         public List<PurchaseOrderItemViewModel> Items { get; set; } = new();
+        public List<PurchaseOrderItemListModel> ItemsList { get; set; } = new();
 
         public List<SupplierList> supplerlist { get; set; }
         public List<BrandsList> brandNamelist { get; set; }
@@ -177,5 +178,22 @@ namespace WebManagementApp.Models
             public Guid idMasterSKU { get; set; }
             public string GTIN { get; set; }
         }
+
+        public class PurchaseOrderItemListModel
+        {
+            public Guid idPurchaseOrderProduct { get; set; }
+            public Guid idPurchaseOrder { get; set; }
+            public string? GTIN { get; set; }
+            public string MasterSKU { get; set; }
+            public string ItemName { get; set; }
+            public int Quantity { get; set; }
+            public int ReceivedCount { get; set; }
+            public int AmershamQuantity { get; set; }
+            public int WatfordQuantity { get; set; }
+            public int DamageCount { get; set; }
+            public int MissingCount { get; set; }
+            public string? IssueDescription { get; set; }
+        }
+
     }
 }

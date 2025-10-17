@@ -29,5 +29,7 @@ namespace WebManagementApp.DataAccess.Interfaces
         Task<ResponseModel> GetStockReceiptReportData();
         Task<ResponseModel> GetStockAgingReportData(string selectedFilter);
         string GetLastPoNumber();
+        Task<PurchaseOrderModel> GetPurchaseOrderDetailsList(string id);
+        PurchaseOrderModel UpdatePurchaseOrderList(PurchaseOrderModel model, string userName);
     }
 }

@@ -497,5 +497,17 @@
                 isValidInput.value = false;
             }
         }
+
+        //Title hover functions.
+            $(document).on('mouseenter', '.item-name-label', function () {
+                const $this = $(this);
+                if ($this.width() < $this[0].scrollWidth) {
+                    $this.css('white-space', 'normal');
+                }
+            });
+            $(document).on('mouseleave', '.item-name-label', function () {
+                const $this = $(this);
+                $this.css('white-space', 'nowrap');
+            });
     </script>
 }

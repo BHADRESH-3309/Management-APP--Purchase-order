@@ -193,6 +193,7 @@ namespace WebManagementApp.Models
             public int DamageCount { get; set; }
             public int MissingCount { get; set; }
             public string? IssueDescription { get; set; }
+            public bool IsValid { get; set; } = false;
         }
 
     }

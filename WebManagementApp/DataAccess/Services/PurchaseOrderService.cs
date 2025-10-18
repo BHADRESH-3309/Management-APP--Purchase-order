@@ -137,8 +137,8 @@ namespace WebManagementApp.DataAccess.Services
                 if (model.Items != null && model.Items.Any())
                 {
                     string insertItemQuery = @"INSERT INTO tblPurchaseOrderProduct (idPurchaseOrder, MasterSKU, ItemName, 
-                            Brand, GTIN, Quantity, Price, Exchange, Status)
-                            VALUES (@idPurchaseOrder, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange, @Status)";
+                            Brand, GTIN, Quantity, Price, Exchange)
+                            VALUES (@idPurchaseOrder, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange)";
 
                     foreach (var item in model.Items)
                     {
@@ -151,8 +151,7 @@ namespace WebManagementApp.DataAccess.Services
                             item.GTIN,
                             item.Quantity,
                             item.Price,
-                            item.Exchange,
-                            Status = "Created"
+                            item.Exchange
                         });
                     }
                 }
@@ -307,9 +306,9 @@ namespace WebManagementApp.DataAccess.Services
 
                     string insertItemQuery = string.Empty;
                     insertItemQuery = @"INSERT INTO tblPurchaseOrderProduct (idPurchaseOrder, MasterSKU, ItemName, 
-                            Brand, GTIN, Quantity, Price, Exchange, Status)
+                            Brand, GTIN, Quantity, Price, Exchange)
                             VALUES (@idPurchaseOrder, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price,
-                            @Exchange, @Status)";
+                            @Exchange)";
 
                     foreach (var item in model.Items)
                     {
@@ -338,8 +337,7 @@ namespace WebManagementApp.DataAccess.Services
                                 item.GTIN,
                                 item.Quantity,
                                 item.Price,
-                                item.Exchange,
-                                Status = "Created"
+                                item.Exchange
                             });
                         }                     
                     }
@@ -611,8 +609,8 @@ ORDER BY
         public PurchaseOrderModel GetUpdatePOItemDetails(string id)
         {
             string query = @"SELECT po.idPurchaseOrder, pop.idPurchaseOrderProduct, po.PONumber, po.SupplierName, 
-                            pop.MasterSKU, pop.ItemName, pop.Quantity, pop.DamageCount, pop.MissingCount,                                                                                                                     
-                            pop.Status, pop.ReceivedDate, pop.IssueDescription, ISNULL(t.ReceivedCount, 0) AS ReceivedCount from tblPurchaseOrder po 
+                            pop.MasterSKU, pop.ItemName, pop.Quantity, pop.DamageCount, pop.MissingCount,
+                            pop.ReceivedDate, pop.IssueDescription, ISNULL(t.ReceivedCount, 0) AS ReceivedCount from tblPurchaseOrder po 
                             INNER JOIN tblPurchaseOrderProduct pop ON po.idPurchaseOrder = pop.idPurchaseOrder
 							OUTER APPLY (SELECT SUM(ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) 
 							 + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)) AS ReceivedCount
@@ -631,7 +629,7 @@ ORDER BY
         {
             string query = string.Empty;
       
-            query = @"UPDATE tblPurchaseOrderProduct SET Status = @status, ReceivedDate = @receivedDate, 
+            query = @"UPDATE tblPurchaseOrderProduct SET ReceivedDate = @receivedDate, 
                     MissingCount = @missingCount, DamageCount = @damageCount, IssueDescription = @issueDescription,
                     AmershamQuantity = @amershamQuantity, WatfordQuantity = @watfordQuantity,
                     ModifyDate = GetDate() WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct";
@@ -1038,10 +1036,10 @@ ORDER BY
 	pop.ItemName,
 	pop.Quantity,
 	t.ReceivedCount,
-	pop.AmershamQuantity,
-	pop.WatfordQuantity,
-	pop.DamageCount, 
-	pop.MissingCount, 
+	0 AmershamQuantity,
+	0 WatfordQuantity,
+	0 DamageCount, 
+	0 MissingCount, 
 	pop.IssueDescription 
 	FROM
 	tblPurchaseOrderProduct pop 
@@ -1074,9 +1072,7 @@ ORDER BY
 
         public PurchaseOrderModel UpdatePurchaseOrderList(PurchaseOrderModel model, string userName)
         {
-
-
-            if (model.idPurchaseOrder != Guid.Empty && model.ItemsList != null && model.ItemsList.Count > 0)
+            if (model.idPurchaseOrder != Guid.Empty && model.ItemsList != null && model.ItemsList.Where(x=>x.IsValid).ToList().Count > 0)
             {
                 /* Update Purchase Order  */
                 string updatePOQuery = string.Empty;
@@ -1090,7 +1086,7 @@ ORDER BY
                 }).GetAwaiter().GetResult();
 
                 /* Update Purchase Order List */
-                foreach (var item in model.ItemsList)
+                foreach (var item in model.ItemsList.Where(x => x.IsValid).ToList())
                 {
                     string query = string.Empty;
 

@@ -25,8 +25,12 @@
 
 
     <style>
+
+    tr.danger-custom > td {
+        background-color: #ffb3b3 !important;
+    }
         .item-name-label {
-            width: 350px !important;
+            width: 120px !important;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -127,11 +131,12 @@
                                             <input type="hidden" asp-for="@Model.ItemsList[i].idPurchaseOrderProduct" />
                                             <input type="hidden" asp-for="@Model.ItemsList[i].idPurchaseOrder" />
                                             <input type="hidden" asp-for="@Model.ItemsList[i].GTIN" />
+                                            <input type="hidden" class="IsValidEntry" asp-for="@Model.ItemsList[i].IsValid" />
                                             @Model.ItemsList[i].GTIN
                                         </td>
 
                                         <td>
-                                            <input type="hidden" asp-for="@Model.ItemsList[i].MasterSKU" />
+                                            <input type="hidden" class="item-sku-label" asp-for="@Model.ItemsList[i].MasterSKU" />
                                             @Model.ItemsList[i].MasterSKU
                                         </td>
 
@@ -185,9 +190,10 @@
                                         </td>
 
                                         <td>
-                                            <input asp-for="@Model.ItemsList[i].IssueDescription"
+                                            <textarea asp-for="@Model.ItemsList[i].IssueDescription"
                                                    type="text"
-                                                   class="form-control quantity-input inputIssueDesc" />
+                                                      placeholder="Enter Issue Description"
+                                                      class="form-control quantity-input inputIssueDesc"></textarea>
                                         </td>
                                     </tr>
                                 }
@@ -207,6 +213,24 @@
             <a href="/PurchaseOrder/PurchaseOrder" class="btn btn-info">Cancel</a>            
         </div>
     </form>
+
+    <div class="modal fade" id="validationSummaryModal" tabindex="-1" aria-labelledby="validationSummaryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="validationSummaryModalLabel">Review Before Submit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="validationSummaryMessage">
+                    
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelValidationBtn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmValidationBtn">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
@@ -230,6 +254,7 @@
             const watfordInputs = document.querySelectorAll('input.inputWatford');
             const damageInputs = document.querySelectorAll('input.inputDamage');
             const missingInputs = document.querySelectorAll('input.inputMissing');
+            
 
             // Disable all inputs by default
             amershamInputs.forEach(i => i.disabled = true);
@@ -288,6 +313,7 @@
         // Submit handler
         form.addEventListener('submit', function (event) {
             debugger
+            $("#confirmValidationBtn").show();
             event.preventDefault(); // Prevent default submission
 
             // Clear errors first
@@ -309,14 +335,19 @@
 
             // Get all table rows
             const rows = document.querySelectorAll('#itemList tr');
+            let validCount = 0;
+            let invalidCount = 0;
+            let hasValidDelivery = false;
 
             // Validate per row:
             // 1) Sum of Amersham+Watford+Damage+Missing <= Remaining Quantity (TotalQuantity - PreviousReceived)
             // 2) At least one row has (Amersham > 0 or Watford > 0) for 'Fully Received' or 'Partial Received'
 
-            let hasValidDelivery = false;
+            
 
             for (const row of rows) {
+                hasValidDelivery = false
+                var rowValid =  false;
                 const totalQty = parseInt(row.querySelector('.totalQuantity').textContent.trim()) || 0;
                 const prevReceived = parseInt(row.querySelector('.previousReceived').textContent.trim()) || 0;
                 const remainingQty = totalQty - prevReceived;
@@ -325,6 +356,7 @@
                 const watfordInput = row.querySelector('input.inputWatford');
                 const damageInput = row.querySelector('input.inputDamage');
                 const missingInput = row.querySelector('input.inputMissing');
+                const isValidInputs = row.querySelector('input.IsValidEntry');
 
                 const amershamVal = amershamInput ? parseInt(amershamInput.value.trim()) || 0 : 0;
                 const watfordVal = watfordInput ? parseInt(watfordInput.value.trim()) || 0 : 0;
@@ -335,37 +367,135 @@
 
                 // Check sum does not exceed remaining quantity
                 if (sumInputs > remainingQty) {
-                    toastr.error(`Row with item "${row.querySelector('.item-name-label').textContent}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
-                    return;
+                    //toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                    isValidInputs.value = false;
+                    hasValidDelivery = false;
+                    //return;
                 }
 
                 // Check at least one row has delivery if status requires it
-                if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && (amershamVal > 0 || watfordVal > 0)) {
+                if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && (amershamVal > 0 || watfordVal > 0) && !(sumInputs > remainingQty)) {
                     hasValidDelivery = true;
+                    isValidInputs.value = true;                    
                 }
-            }
+            
 
             // Final validation for delivered stock presence
-            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && !hasValidDelivery) {
-                toastr.error('Add delivered stock - Both Amersham and Watford quantities are 0 for all items.');
-                return;
+            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received')) {
+                //toastr.error('Add delivered stock - Both Amersham and Watford quantities are 0 for all items.');
+                //isValidInputs.value = false;
+                //hasValidDelivery = false;
+                //return;
             }
 
             if (idStatus.value === 'Damage Received') {
-                for (const row of rows) {
-                    const totalQty = parseInt(row.querySelector('.totalQuantity').textContent.trim()) || 0;
-                    const damageInput = row.querySelector('input.inputDamage');
-                    const damageVal = damageInput ? parseInt(damageInput.value.trim()) || 0 : 0;
-
-                    if (damageVal !== totalQty) {
-                        toastr.error(`For 'Damage Received', Damage Count must equal the total quantity (${totalQty}) for item "${row.querySelector('.item-name-label').textContent}".`);
-                        return;
+               if (sumInputs > remainingQty) {
+                        //toastr.error(`For 'Damage Received', Damage Count must equal the total quantity (${totalQty}) for SKU "${row.querySelector('.item-sku-label').value}".`);
+                        isValidInputs.value = false;
+                        hasValidDelivery = false;
+                        //return;
                     }
-                }
             }
 
+            if(sumInputs == 0){
+                    hasValidDelivery = true;
+                    isValidInputs.value = true;
+                    }
+
             // If all validations pass, submit the form
-            form.submit();
+             if (hasValidDelivery) {
+                    validCount++;
+                    isValidInputs.value = true;
+                    row.classList.remove('danger-custom');
+                } else {
+                    invalidCount++;
+                    isValidInputs.value = false;
+                    row.classList.add('danger-custom');
+                }
+         }
+            // If invalid rows exist, show modal, else submit directly
+            $("#confirmValidationBtn").show();
+            if(validCount === 0)
+            {
+                $("#confirmValidationBtn").hide();
+            }
+            if (invalidCount > 0) {
+                document.getElementById('validationSummaryMessage').textContent =
+                    `There are ${validCount} valid row(s) and ${invalidCount} invalid row(s). Do you want to submit anyway?`;
+
+                // Show the modal
+                $("#validationSummaryModal").modal("show");
+            } else {
+                 document.getElementById('validationSummaryMessage').textContent =
+                    `All ${validCount} row(s) are valid. Submit to continue.`;
+
+                // Show the modal
+                $("#validationSummaryModal").modal("show");
+            }
+            
         });
+
+
+        $("#confirmValidationBtn").click(function(){
+            $("#updatepurchaseOrderForm").trigger("submit");
+        });
+
+                document.querySelectorAll('#itemList input.quantity-input').forEach(input => {
+            input.addEventListener('input', function () {
+                const row = this.closest('tr');
+                validateRow(row);
+            });
+        });
+
+        function validateRow(row) {
+            const totalQty = parseInt(row.querySelector('.totalQuantity').textContent.trim()) || 0;
+            const prevReceived = parseInt(row.querySelector('.previousReceived').textContent.trim()) || 0;
+            const remainingQty = totalQty - prevReceived;
+
+            const amershamInput = row.querySelector('input.inputAmersham');
+            const watfordInput = row.querySelector('input.inputWatford');
+            const damageInput = row.querySelector('input.inputDamage');
+            const missingInput = row.querySelector('input.inputMissing');
+            const isValidInput = row.querySelector('input.IsValidEntry');
+
+            const amershamVal = parseInt(amershamInput?.value.trim()) || 0;
+            const watfordVal = parseInt(watfordInput?.value.trim()) || 0;
+            const damageVal = parseInt(damageInput?.value.trim()) || 0;
+            const missingVal = parseInt(missingInput?.value.trim()) || 0;
+
+            const sumInputs = amershamVal + watfordVal + damageVal + missingVal;
+
+            let isValid = true;
+
+            // 1️⃣ Check sum does not exceed remaining quantity
+            if (sumInputs > remainingQty) {
+                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                isValid = false;
+            }
+            const status = document.getElementById('Status').value;
+            if (status === 'Damage Received') {
+                if (sumInputs > remainingQty) {
+                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                isValid = false;
+            }     
+            }
+
+            
+
+            // 3️⃣ For 'Partial' or 'Fully Received' → At least one location > 0
+            if ((status === 'Fully Received' || status === 'Partial Received') && amershamVal === 0 && watfordVal === 0) {
+                toastr.error('Add delivered stock - Both Amersham and Watford quantities are 0 for all items.');
+                isValid = false;
+            }
+
+            // Apply class and update hidden input
+            if (isValid) {
+                row.classList.remove('danger-custom');
+                isValidInput.value = true;
+            } else {
+                row.classList.add('danger-custom');
+                isValidInput.value = false;
+            }
+        }
     </script>
 }

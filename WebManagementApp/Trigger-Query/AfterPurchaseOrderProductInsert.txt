@@ -1,27 +1,28 @@
 ﻿USE [dbManagementApp]
 GO
-/****** Object:  Trigger [dbo].[AfterPurchaseOrderProductInsert]    Script Date: 17/09/2025 15:28:15 ******/
+/****** Object:  Trigger [dbo].[AfterPurchaseOrderProductInsert]    Script Date: 18-10-2025 23:21:39 ******/
 SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE TRIGGER [dbo].[AfterPurchaseOrderProductInsert] ON [dbo].[tblPurchaseOrderProduct]
+-- =============================================
+-- Author:		<Author,,Name>
+-- Create date: <Create Date,,>
+-- Description:	<Description,,>
+-- =============================================
+ALTER TRIGGER [dbo].[AfterPurchaseOrderProductInsert] ON [dbo].[tblPurchaseOrderProduct]
 FOR INSERT
 AS DECLARE @idPurchaseOrderProduct UNIQUEIDENTIFIER, @MasterSKU nvarchar(50), @ItemName nvarchar(512), @Brand nvarchar(120), @GTIN nvarchar(120), 
-@Quantity int, @Price float, @Exchange float, @Status nvarchar(500), @ReceivedDate datetime, @DamageCount int, 
+@Quantity int, @Price float, @Exchange float,  @ReceivedDate datetime, @DamageCount int, 
 @MissingCount int, @IssueDescription nvarchar(MAX), @AmershamQuantity int, @WatfordQuantity int;
  
 SELECT @idPurchaseOrderProduct = ins.idPurchaseOrderProduct, @MasterSKU = ins.MasterSKU, @ItemName = ins.ItemName, @Brand = ins.Brand,
-@GTIN = ins.GTIN, @Quantity = ins.Quantity, @Price = ins.Price, @Exchange = ins.Exchange, @Status = ins.Status,
+@GTIN = ins.GTIN, @Quantity = ins.Quantity, @Price = ins.Price, @Exchange = ins.Exchange, 
 @ReceivedDate = ins.ReceivedDate, @DamageCount = ins.DamageCount, @MissingCount = ins.MissingCount, @IssueDescription = ins.IssueDescription,
 @AmershamQuantity = ins.AmershamQuantity, @WatfordQuantity = ins.WatfordQuantity 
 FROM INSERTED ins;
  
 INSERT INTO [tblPurchaseOrderProductHistory] (idPurchaseOrderProduct, MasterSKU, ItemName, Brand, GTIN, Quantity, Price, Exchange, 
 Status, ReceivedDate, DamageCount, MissingCount, IssueDescription, AmershamQuantity, WatfordQuantity)
-VALUES(@idPurchaseOrderProduct, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange, @Status, @ReceivedDate, 
+VALUES(@idPurchaseOrderProduct, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange, 'Created', @ReceivedDate, 
 @DamageCount, @MissingCount, @IssueDescription, @AmershamQuantity, @WatfordQuantity);
-GO
-
-ALTER TABLE [dbo].[tblPurchaseOrderProduct] ENABLE TRIGGER [AfterPurchaseOrderProductInsert]
-GO

@@ -1,0 +1,834 @@
+﻿@model WebManagementApp.Models.SupplierModel
+@{
+    ViewData["Title"] = "Supplier Page";
+}
+@if (ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" id="alertMessage" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewBag.SuccessMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" id="alertMessage" role="alert">
+        @ViewBag.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles{
+    <style>
+      @@media screen and (max-width: 1520px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+
+        .table-overlay {
+            width: 1500px !important;
+        }
+    </style>
+    <style>
+        @@media screen and (max-width: 610px) {
+            .modal-dialog-centered {
+                display: contents !important;
+            }
+
+            #verticalycentered {
+                padding-right: 0px !important;
+            }
+
+            .table-overlay {
+                width: 570px !important;
+            }
+        }
+
+        @@media screen and (max-width: 725px) and (min-width: 610px) {
+            .table-overlay {
+                width: 570px !important;
+            }
+        }
+
+        .modal-backdrop.show {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            height: 100% !important;
+            width: 100% !important;
+        }
+    </style>
+}
+<div class="positionrow">
+    <div class="card ">
+        <div class="card-body mt-2">
+            <table id="supplier-table" class="table">
+            </table>
+
+            <div id="table-spinner" class="table-overlay">
+                <div class="spinner-border" role="status">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="verticalycentered" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="col-lg-12">
+                <form class="needs-validation modelform" id="form_supplier" novalidate>
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modal_title">Update Supplier</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Supplier Name:<span style="color:black">*</span></label>
+                                <input type="text" class="form-control" asp-for="SupplierName" id="input_supplierName"
+                                       placeholder="Enter Supplier Name" onkeypress=" return Whitespace(event)" required>
+                                <div class="invalid-feedback">
+                                    Please enter the Supplier Name.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Contact Person:<span style="color:black">*</span></label>
+                                <input type="text" class="form-control" asp-for="ContactPerson" id="input_contactPerson"
+                                       placeholder="Enter Contact Person" onkeypress=" return Whitespace(event)" required>
+                                <div class="invalid-feedback">
+                                    Please enter the Contact Person.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-2">
+
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Email:<span style="color:black">*</span></label>
+                                <input type="email" class="form-control" asp-for="Email" name="email" id="input_email"
+                                       placeholder="Enter Email" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Phone:<span style="color:black">*</span></label>
+                                <input type="text" class="form-control" asp-for="Phone" id="input_phone"
+                                       placeholder="Enter Phone" min="10" maxlength="10" onkeypress="return isNumberKey(event)" oninput="validatePhoneLength(this)" required>
+                                <div class="invalid-feedback">
+                                    Please enter a valid 10-digit phone number.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Address line 1:<span style="color:black">*</span></label>
+                                <textarea type="text" class="form-control" asp-for="Address1" id="input_address1"
+                                          placeholder="Enter Address line 1" rows="3" onkeypress=" return validateAddressInput(event)" required></textarea>
+                                <div class="invalid-feedback">
+                                    Please enter the Address line 1.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label"> Address line 2:<span style="color:black">*</span></label>
+                                <textarea type="text" class="form-control" asp-for="Address2" id="input_address2"
+                                          placeholder="Enter  Address line 2" rows="3" onkeypress=" return validateAddressInput(event)" required></textarea>
+                                <div class="invalid-feedback">
+                                    Please enter the  Address line 2.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">City:<span style="color:black">*</span></label>
+                                <input type="text" class="form-control" asp-for="City" id="input_city"
+                                       placeholder="Enter City" onkeypress=" return Whitespace(event)" required>
+                                <div class="invalid-feedback">
+                                    Please enter the City.
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-sm-12 mb-2">
+                                <label for="inputState" class="form-label">Postcode:<span style="color:black">*</span></label>
+                                <input type="text" class="form-control" asp-for="Postcode" id="input_postcode"
+                                       placeholder="Enter Postcode" onkeypress=" return Whitespace(event)" required>
+                                <div class="invalid-feedback">
+                                    Please enter the Postcode.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+ <div class="modal-footer">
+    <button type="button" class="btn btn-primary" id="btnSaveSupplier">Add</button>
+    <button type="button" class="btn btn-secondary" id="btnCancelSupplier">Cancel</button>
+</div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div
+
+@section Scripts{
+    <script>
+    $("#modal_user_submit").click(function () {
+        // Collect form data
+        var supplierData = {
+            SupplierName: $("#input_supplierName").val(),
+            ContactPerson: $("#input_contactPerson").val(),
+            Email: $("#input_email").val(),
+            Phone: $("#input_phone").val(),
+            Address1: $("#input_address1").val(),
+            Address2: $("#input_address2").val(),
+            City: $("#input_city").val(),
+            Postcode: $("#input_postcode").val(),
+            Mode: "Add"
+        };
+
+        console.log("Sending supplier data:", supplierData);
+
+        // Send AJAX request
+   
+
+        $.ajax({
+    url: '/Supplier/AddSupplier',
+    type: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(supplierData),
+    success: function (response) {
+        if (!response.Error) {
+            toastr.success(response.Message || "Supplier added successfully!");
+            $("#verticalycentered").modal('hide');
+            $("#form_supplier")[0].reset();
+            @* GetSupplierList(); // Refresh table after success *@
+            @* RefreshSupplierTable(); // ✅ automatically reload list *@
+            setTimeout(() => RefreshSupplierTable(), 300);
+
+        } else {
+            toastr.error(response.Message || "Something went wrong!");
+        }
+    },
+    error: function (xhr) {
+        toastr.error("Request failed: " + xhr.statusText);
+    }
+});
+    });
+
+
+
+ function RefreshSupplierTable() {
+    $.ajax({
+        type: "GET",
+        url: "@Url.Action("GetSupplierList", "Supplier")",
+        dataType: "json",
+        success: function (response) {
+            if (response.Error) {
+                toastr.error(response.Message);
+            } else {
+                // ✅ Destroy old table safely
+                if (_SupplierDatatable) {
+                    _SupplierDatatable.destroy();
+                }
+
+                // ✅ Clear existing table HTML (body only)
+                $("#supplier-table tbody").empty();
+
+                // ✅ Rebuild the table
+                GenerateSupplierTable(response.result);
+            }
+        },
+        error: function (xhr) {
+            toastr.error("Failed to refresh supplier list: " + xhr.statusText);
+        }
+    });
+}
+
+
+
+
+</script>
+
+    <script>
+        function addSupplier() {
+            var model = {
+                SupplierName: $("#SupplierName").val(),
+                ContactPerson: $("#ContactPerson").val(),
+                Address1: $("#Address1").val(),
+                Address2: $("#Address2").val(),
+                City: $("#City").val(),
+                Postcode: $("#Postcode").val(),
+                Email: $("#Email").val(),
+                Phone: $("#Phone").val()
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "/Supplier/AddSupplier",
+                data: JSON.stringify(model),
+                contentType: "application/json; charset=utf-8",
+                success: function (res) {
+                    if (!res.Error) {
+                        alert(res.Message);
+                        // Reload table
+                        loadSuppliers();
+                    } else {
+                        alert("Error: " + res.Message);
+                    }
+                }
+            });
+        }
+
+        function loadSuppliers() {
+            $.get("/Supplier/GetSupplierList", function (res) {
+                console.log(res.Result);
+                // Populate table here
+            });
+        }
+
+        $(document).ready(function () {
+            GetSupplierList();
+            // RefreshSupplierTable(); // ✅ automatically reload list
+            setTimeout(() => RefreshSupplierTable(), 300);
+
+            setTimeout(function () {
+                $("#alertMessage").fadeOut();
+            }, 5000);
+        });
+        let _SupplierId = null;
+        let _SupplierDatatable = null;
+        let _SupplierData = null;
+
+        function GetSupplierList() {
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetSupplierList", "Supplier")",
+                dataType: "json",
+                success: function (response) {
+                    if (response.error) {
+                        toastr.error(response.message);
+                    } else {
+
+                        GenerateSupplierTable(response.result);
+                    }
+                    $('#table-spinner').addClass('d-none');
+                },
+                error: function (error) {
+                    $('#table-loading-spinner').addClass('d-none');
+                    toastr.error('Error fetching data: ' + error.responseText);
+                }
+            });
+        }
+
+        function GenerateSupplierTable(data) {
+
+            _SupplierData = data.map((row, index) => [
+                row.idSupplier,
+                row.supplierName ? row.supplierName : '',
+                row.contactPerson ? row.contactPerson : '',
+                row.email ? row.email : '',
+                row.phone ? row.phone : '',
+                row.address1 ? row.address1 : '',
+                row.address2 ? row.address2 : '',
+                row.city ? row.city : '',
+                row.postcode ? row.postcode : '',
+                
+                row.dateAdd ? formatDateTime(row.dateAdd) : '',
+                ` <div class="btn-group gap-2" role="group" aria-label="Product Actions">
+                      <div>
+                           <button type="button" class="btn btn-primary editSupplier" id="${row.idSupplier}"
+                                data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit Supplier details">
+                                 <i class="bi bi-pencil-square editSupplier"></i>
+                             </button>
+                       </div>
+                      <div>
+                        <button type="button" class="btn btn-danger removeSupplier" id="${row.idSupplier}"
+                             data-bs-toggle="tooltip" data-bs-placement="bottom" title="Remove Supplier" onclick="removeSupplier(this.id)">
+                              <i class="bi bi-trash delete"></i>
+                        </button>
+                     </div>
+                </div>  `
+
+            ]);
+
+            _SupplierDatatable = new simpleDatatables.DataTable($('#supplier-table')[0], {
+                data: {
+                    headings: ["Supplier name", "Contact person", "Email", "Phone", "Address line 1", "Address line 2", "City", "Postcode", "DateAdd", "Action"],
+                    data: _SupplierData.map(row => [row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]])
+                },
+                rowRender: (rowValue, tr, _index) => {
+                    if (!tr.attributes) {
+                        tr.attributes = {}
+                    }
+
+                    $('tr.child-row').remove();
+                    $('tr').removeClass('shown');
+
+                    tr.attributes["data-supplierid"] = _SupplierData[_index][0];
+
+                    return tr
+                },
+                perPage: 20,  // Set the default number of records per page
+                perPageSelect: [20, 40, 60],
+                columns: [
+                    {
+                        select: 9,
+                        sortable: false,
+                    }
+                ],
+
+            });
+
+            var searchDiv = document.querySelector(".datatable-search");
+
+            //  Remove existing buttons before adding new ones
+            if (document.getElementById("export-excel-button")) {
+                document.getElementById("export-excel-button").remove();
+            }
+            if (document.getElementById("mapping_add_button")) {
+                document.getElementById("mapping_add_button").remove();
+            }
+
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+                const heading = ["Supplier name", "Contact person", "Email", "Phone", "Address line 1", "Address line 2", "City", "Postcode", "DateAdd"];
+                //Set column indexes as per the productTableData headings
+                const columnIndexes = {
+                    SupplierName: 1,
+                    ContactPerson: 2,
+                    Email: 3,
+                    Address1: 4,
+                    Address2: 5,
+                    City: 6,
+                    Postcode: 7,
+                    DateAdd: 8
+                };
+
+                let excelData = [];
+                if (_SupplierDatatable.totalPages > 0) {
+                    const indexes = Object.values(columnIndexes).map(index => index - 1); // Convert to zero-based indexes
+
+                    excelData = _SupplierDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells
+                                .map(cell => cell.text)
+                                .filter((_, cellIndex) => indexes.includes(cellIndex)) // Select only the desired columns
+                        )
+                    ).flat();
+                }
+
+                // Get table data
+                let combinedArray = [heading, ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [7]; // Columns that need to be numbers
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Suppplier.xlsx');
+            };
+            searchDiv.appendChild(button);
+
+
+            var addButton = document.createElement("button");
+            addButton.innerText = "Add";
+            addButton.type = "button";
+            addButton.title = "Add Supplier details"
+            addButton.id = "mapping_add_button";
+            addButton.className = "btn btn-primary";
+            addButton.style.marginBottom = "3px";
+            addButton.style.marginLeft = "5px";
+            addButton.onclick = function () {   //Open modal on add button click
+              
+                document.getElementById('modal_title').innerHTML = 'Add Supplier';
+               
+                document.getElementById("input_supplierName").value = '';
+                document.getElementById("input_contactPerson").value = '';
+                document.getElementById("input_email").value = '';
+                document.getElementById("input_phone").value = '';
+                document.getElementById("input_address1").value = '';
+                document.getElementById("input_address2").value = '';
+                document.getElementById("input_city").value = '';
+                document.getElementById("input_postcode").value = '';
+                const myModal = new bootstrap.Modal(document.getElementById('verticalycentered'));
+
+                myModal.show();
+            };
+
+            searchDiv.appendChild(addButton);
+
+            // Event listener for edit user button
+            $(document).off('click', '.editSupplier').on('click', '.editSupplier', function () {
+
+                // Get the current row
+                let $row = $(this).closest('tr');
+                let idSupplier = $row.data('supplierid');  // use data attribute
+                let supplierName = $row.find('td').eq(0).text().trim();
+                let contactPerson = $row.find('td').eq(1).text().trim();
+                let email = $row.find('td').eq(2).text().trim();
+                let phone = $row.find('td').eq(3).text().trim();
+                let address1 = $row.find('td').eq(4).text().trim();
+                let address2 = $row.find('td').eq(5).text().trim();
+                let city = $row.find('td').eq(6).text().trim();
+                let postcode = $row.find('td').eq(7).text().trim();
+               
+                editSupplierModal({
+                    idSupplier,
+                    supplierName,
+                    contactPerson,
+                    email,
+                    phone,
+                    address1,
+                    address2,
+                    city,
+                    postcode
+                });
+
+                //handleSupplierEdit(idSupplier, supplierName, contactPerson, email, phone, address1.address2, city, postcode);  // Call function to user edit
+            });
+        }
+
+        let _IsAnyRecordDeleted = false;
+        let _IsAnyRecordInserted = false;
+        let _IsAnyRecordUpdated = false;
+        //Add user moddel// Update table data when modal is closed and sku is deleted from modal list
+        document.getElementById('verticalycentered').addEventListener('hidden.bs.modal', function () {
+            const formMapping = document.querySelector('#form_supplier');
+            formMapping.classList.remove('was-validated');
+            formMapping.reset();
+
+            if (_IsAnyRecordInserted) {
+                if (_SupplierDatatable) {
+                    _SupplierDatatable.destroy();
+                }
+                GenerateSupplierTable(_userData);
+            }
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            selectedEmail = null;
+            // Page form submission validation
+            const formUser = document.querySelector('#form_supplier');
+
+            formUser.addEventListener('submit', function (event) {
+                if (!formUser.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                formUser.classList.add('was-validated');
+            }, false);
+
+            // Mapping modal form submission validation
+            const formMapping = document.querySelector('#form_supplier');
+            const submitButton = document.getElementById('modal_user_submit');
+
+            submitButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!formMapping.checkValidity()) {
+                    formMapping.classList.add('was-validated');
+                } else {
+                    AddOrUpdateSupplier();
+                    formMapping.classList.remove('was-validated');
+                }
+            });
+
+        }, false);
+
+
+let selectedSupplierId = null;
+
+//  Open modal for Add
+function openAddSupplierModal() {
+    selectedSupplierId = null;
+    $("#modal_title").text("Add Supplier");
+    $("#btnSaveSupplier").text("Add");
+    $("#form_supplier")[0].reset();
+    $("#verticalycentered").modal("show");
+}
+
+//  Open modal for Edit
+function editSupplierModal(data) {
+    selectedSupplierId = data.idSupplier; // ✅ Always store current ID
+    $("#modal_title").text("Update Supplier");
+    $("#btnSaveSupplier").text("Update");
+
+    // Fill form fields
+    $("#input_supplierName").val(data.supplierName);
+    $("#input_contactPerson").val(data.contactPerson);
+    $("#input_email").val(data.email);
+    $("#input_phone").val(data.phone);
+    $("#input_address1").val(data.address1);
+    $("#input_address2").val(data.address2);
+    $("#input_city").val(data.city);
+    $("#input_postcode").val(data.postcode);
+
+    $("#verticalycentered").modal("show");
+}
+
+$("#btnSaveSupplier").off("click").on("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const form = document.getElementById("form_supplier");
+
+    // Check validation
+    if (!form.checkValidity()) {
+        form.classList.add("was-validated");
+        return; // stop if invalid
+    }
+
+    // ✅ Passed validation — proceed
+    let supplierData = {
+        SupplierName: $("#input_supplierName").val().trim(),
+        ContactPerson: $("#input_contactPerson").val().trim(),
+        Email: $("#input_email").val().trim(),
+        Phone: $("#input_phone").val().trim(),
+        Address1: $("#input_address1").val().trim(),
+        Address2: $("#input_address2").val().trim(),
+        City: $("#input_city").val().trim(),
+        Postcode: $("#input_postcode").val().trim()
+    };
+
+    let url = selectedSupplierId ? "/Supplier/UpdateSupplier" : "/Supplier/AddSupplier";
+    if (selectedSupplierId) supplierData.idSupplier = selectedSupplierId;
+
+    $.ajax({
+        type: "POST",
+        url: url,
+        contentType: "application/json",
+        data: JSON.stringify(supplierData),
+      
+
+
+        success: function (response) {
+    if (!response.Error) {
+        if (selectedSupplierId) {
+            // ✅ Update case
+            toastr.success(response.Message || "Supplier updated successfully!");
+        } else {
+            // ✅ Add case
+            toastr.success(response.Message || "Supplier added successfully!");
+        }
+
+        $("#verticalycentered").modal('hide');
+        $("#form_supplier")[0].reset();
+        selectedSupplierId = null;
+        $("#btnSaveSupplier").text("Add");
+        $("#modal_title").text("Add Supplier");
+
+        // ✅ Refresh table after success
+        setTimeout(() => RefreshSupplierTable(), 300);
+    } else {
+        toastr.error(response.Message || "Something went wrong!");
+    }
+},
+
+        error: function (xhr) {
+            toastr.error("Request failed: " + xhr.statusText);
+        }
+    });
+});
+
+
+
+
+// 🔸 Cancel button
+$("#btnCancelSupplier").off("click").on("click", function () {
+    $("#verticalycentered").modal("hide");
+    $("#form_supplier")[0].reset();
+    selectedSupplierId = null;
+    $("#btnSaveSupplier").text("Add");
+    $("#modal_title").text("Add Supplier");
+});
+
+// 🔸 Reset modal when closed
+$("#verticalycentered").on("hidden.bs.modal", function () {
+    $("#form_supplier")[0].reset();
+    selectedSupplierId = null;
+    $("#btnSaveSupplier").text("Add");
+    $("#modal_title").text("Add Supplier");
+});
+
+
+
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xFF;
+            }
+            return buf;
+        }
+
+        function formatDateTime(dateString) {
+
+            if (!dateString) {
+                return '';
+            }
+            const date = new Date(dateString);
+
+            // Define options for formatting date and time
+            const dateOptions = {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            };
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            };
+
+            // Format date and time separately
+            const formattedDate = new Intl.DateTimeFormat('en-GB', dateOptions).format(date); // 'DD/MM/YYYY'
+            const formattedTime = new Intl.DateTimeFormat('en-US', timeOptions).format(date); // 'HH:MM AM/PM'
+
+            // Combine formatted date and time
+            return `${formattedDate} ${formattedTime}`;
+        }
+
+        //Remove
+
+
+        function removeSupplier(id) {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: 'This will permanently delete the supplier.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, delete it!',
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '/Supplier/DeleteSupplier',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ idSupplier: id }),
+                success: function (response) {
+                    if (!response.Error) {
+                        toastr.success(response.Message || "Supplier deleted successfully!");
+                        setTimeout(() => RefreshSupplierTable(), 300);
+                    } else {
+                        toastr.error(response.Message || "Delete failed!");
+                    }
+                },
+                error: function (xhr) {
+                    toastr.error("Delete failed: " + xhr.statusText);
+                }
+            });
+        }
+    });
+}
+
+  </script>
+
+    <script>
+        function Whitespace(e) {
+            var key = event.keyCode || event.which;
+
+            // Get the current value in the textbox
+            var inputValue = event.target.value;
+
+            // Check if the pressed key is a valid character (alphanumeric) or space
+            var inputChar = String.fromCharCode(key);
+            var pattern = /^[a-zA-Z0-9]+( [a-zA-Z0-9]+)*$/; // Allow words separated by a single space
+
+            // Check if the entered character combined with the existing text violates the pattern
+            if (!pattern.test((inputValue + inputChar).trim()) || /^\s/.test(inputValue + inputChar)) {
+                event.preventDefault();
+                return false;
+            }
+            return true;
+        }
+        // Allow only digits
+        function isNumberKey(evt) {
+            var charCode = evt.which ? evt.which : evt.keyCode;
+            if (charCode < 48 || charCode > 57) {
+                return false;
+            }
+            return true;
+        }
+
+        // Enforce 10-digit max
+        function validatePhoneLength(input) {
+            if (input.value.length > 10) {
+                input.value = input.value.slice(0, 10);
+            }
+        }
+
+function validateAddressInput(event) {
+    var key = event.keyCode || event.which;
+    var inputValue = event.target.value;
+    var inputChar = String.fromCharCode(key);
+
+     // ✅ Allow alphabets, numbers, spaces, commas, periods, slashes, hyphens, ampersand, underscore, and all 6 brackets
+    var pattern = /^[a-zA-Z0-9,\.\-\/&_()\[\]{} ]+$/;
+
+    // 🚫 Block invalid characters (anything outside the allowed set)
+    if (!pattern.test(inputChar)) {
+        event.preventDefault();
+        return false;
+    }
+
+    // 🚫 Prevent leading space (first character cannot be a space)
+    if (inputValue.length === 0 && inputChar === " ") {
+        event.preventDefault();
+        return false;
+    }
+
+    // 🚫 Prevent double spaces (no consecutive spaces)
+    if (inputValue.slice(-1) === " " && inputChar === " ") {
+        event.preventDefault();
+        return false;
+    }
+
+    return true;
+}
+
+    </script>
+}

@@ -26,19 +26,11 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddTransient<IUserService, UserService>();
 builder.Services.AddTransient<ITokenService, TokenService>();
 builder.Services.AddTransient<ISqlDataAccess, SqlDataAccess>();
-//builder.Services.AddTransient<IProductListService, ProductListService>();
-//builder.Services.AddTransient<IMasterSKUService, MasterSKUService>();
-//builder.Services.AddTransient<IMappingSKUService, MappingSKUService>();
-builder.Services.AddTransient<ISettingsService, SettingsService>();
-//builder.Services.AddTransient<IInventoryService, InventoryService>();
-//builder.Services.AddTransient<IInventorySyncService, InventorySyncService>();
-//builder.Services.AddTransient<IMasterInventoryService, MasterInventoryService>();
-//builder.Services.AddTransient<ISalesService, SalesService>();
-//builder.Services.AddTransient<IReportingService, ReportingService>();
-//builder.Services.AddTransient<IDashboardService, DashboardService>();
-builder.Services.AddTransient<IManageUserService, ManageUserService>();
+builder.Services.AddTransient<IInventoryService, InventoryService>();
+builder.Services.AddTransient<IMasterInventoryService, MasterInventoryService>();
 builder.Services.AddTransient<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddHttpContextAccessor();
+
 
 
 
@@ -110,8 +102,6 @@ app.Use(async (context, next) =>
 
     await next();
 });
-
-
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

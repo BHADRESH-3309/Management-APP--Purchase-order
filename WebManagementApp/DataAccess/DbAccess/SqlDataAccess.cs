@@ -104,6 +104,8 @@ namespace WebManagementApp.DataAccess.DbAccess
             sqlBulkCopy.ColumnMappings.Add("Weight", "Weight");
             sqlBulkCopy.ColumnMappings.Add("ProductSource", "ProductSource");
             sqlBulkCopy.ColumnMappings.Add("idBrand", "idBrand");
+            sqlBulkCopy.ColumnMappings.Add("idCategory", "idCategory");
+            sqlBulkCopy.ColumnMappings.Add("idShippingLabel", "idShippingLabel");
             sqlBulkCopy.ColumnMappings.Add("GTIN", "GTIN");
             sqlBulkCopy.ColumnMappings.Add("EAN", "EAN");
             sqlBulkCopy.ColumnMappings.Add("Barcode", "Barcode");
@@ -136,7 +138,8 @@ namespace WebManagementApp.DataAccess.DbAccess
             query = $@"CREATE TABLE {tempTable}([SKU] [nvarchar](300), [Title] [nvarchar](512),Description [nvarchar](max),
                     Note [nvarchar](max), Weight[decimal](10,2),idBrand [uniqueidentifier] null ,ProductSource [nvarchar](100), 
                     EAN [nvarchar](50), GTIN [nvarchar] (120), Barcode [nvarchar] (120), 
-                    Width [decimal] (15,2),Length [decimal](15,2),Height [decimal](15,2))";
+                    Width [decimal] (15,2),Length [decimal](15,2),Height [decimal](15,2),
+                    idCategory [uniqueidentifier] null , idShippingLabel [uniqueidentifier] null )";
 
 
             ExecuteDML(query, new { }).GetAwaiter().GetResult();
@@ -155,6 +158,8 @@ namespace WebManagementApp.DataAccess.DbAccess
             sqlBulkCopy.ColumnMappings.Add("Weight", "Weight");
             sqlBulkCopy.ColumnMappings.Add("ProductSource", "ProductSource");
             sqlBulkCopy.ColumnMappings.Add("idBrand", "idBrand");
+            sqlBulkCopy.ColumnMappings.Add("idCategory", "idCategory");
+            sqlBulkCopy.ColumnMappings.Add("idShippingLabel", "idShippingLabel");
             sqlBulkCopy.ColumnMappings.Add("GTIN", "GTIN");
             sqlBulkCopy.ColumnMappings.Add("EAN", "EAN");
             sqlBulkCopy.ColumnMappings.Add("Barcode", "Barcode");
@@ -173,7 +178,8 @@ namespace WebManagementApp.DataAccess.DbAccess
             string updateBulkDataQuery = @$"UPDATE M SET M.Title = T.Title,M.Description = T.Description,
                                            M.Weight = T.Weight, M.ProductSource = T.ProductSource,M.Note = T.Note,
                                            M.idBrand = T.idBrand, M.GTIN = T.GTIN , M.EAN = T.EAN , M.Barcode = T.Barcode,
-                                           M.Width = T.Width ,M.Length = T.Length,M.Height = T.Height,M.ModifyTime = getdate()
+                                           M.Width = T.Width ,M.Length = T.Length,M.Height = T.Height, M.ModifyTime = getdate(),
+                                           M.idCategory = T.idCategory, M.idShippingLabel = T.idShippingLabel                                           
                                            FROM tblMasterSKU AS M INNER JOIN {tempTable} AS T ON M.SKU = T.SKU";
 
             ExecuteDML(updateBulkDataQuery, new { }).GetAwaiter().GetResult();
@@ -401,8 +407,7 @@ namespace WebManagementApp.DataAccess.DbAccess
             }
             sqlBulkCopy.WriteToServer(dt_temp);
             connection.Close();
-        }    
-
+        }      
     }
 
 }

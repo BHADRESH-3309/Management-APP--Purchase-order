@@ -1,0 +1,1612 @@
+﻿@model WebManagementApp.Models.MasterInventoryModel
+
+@{
+    ViewData["Title"] = "Master Inventory";
+}
+
+@{
+    var showTitleBaseUrl = Url.Action("Index", "MappingSKU");
+}
+
+@if (ViewData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles {
+    <style>
+
+        .title {
+            max-width: 350px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Apply these styles to the table */
+        .datatable-table{
+            border-collapse: collapse!important;
+        }
+
+        #dataTable th {
+            border: 1px solid #ddd!important;
+            cursor: pointer;
+        }
+
+        #dataTable td {
+            border: 1px solid #ddd!important;
+        }
+
+        .colspan-textalign {
+            text-align: center !important;
+        }
+
+        .th-SKU {
+            width: 150px !important;
+        }
+
+        .th-MappingSKU {
+            width: 400px !important;
+        }
+
+        .InputCheckbox {
+            margin-top: 11px !important;
+            margin-left: 20px !important;
+        }
+       
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .input-qty {
+            width: 60px!important;
+            border: 1px solid #ddd!important;
+        }        
+
+        .mst-details-control {           
+            color: blue!important;
+            cursor: pointer!important;
+        }
+
+        .avg-cost-control {
+            color: blue !important;
+            cursor: pointer !important;
+        }
+
+        @@media screen and (max-width: 3500px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        .td-sections {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-left, .section-right {
+            display: flex;
+            align-items: center;
+            gap: 5px; 
+        }
+
+        @@media screen and (max-width: 876px) {
+            .modal-dialog-centered {
+                display: contents !important;
+            }
+
+            #verticalycentered {
+                padding-right: 0px !important;
+            }
+
+            #passwordChangedModel {
+                padding-right: 0px !important;
+            }
+
+            .table-overlay {
+                width: 570px !important;
+            }
+        }
+
+        .modal-backdrop.show {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            height: 100% !important;
+            width: 100% !important;
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+    </style>
+}
+
+<div class="card positionrow" id="cardRow">
+    <div class="card-body mt-2">
+        <div id="table-loading-spinner" class="table-overlay">
+            <div class="spinner-border" role="status">
+            </div>
+        </div>
+        <div class="datatable-wrapper datatable-loading no-footer sortable searchable fixed-columns">
+            <div class="datatable-top">
+                <div class="datatable-dropdown">
+                    <label>
+                        <select class="datatable-selector" name="per-page" id="perPageSelector">
+                            <option value="20" selected="">20</option>
+                            <option value="40">40</option>
+                            <option value="60">60</option>
+                        </select> entries
+                    </label>
+                </div>
+                <div class="datatable-search">
+                    <input class="datatable-input" oninput="searchTable()" id="search" placeholder="Search..." type="search" name="search" title="Search within table" aria-controls="productTable">
+                    <button type="button" class="btn btn-secondary" style="margin-bottom: 3px;" onclick="exportExcel()">Export Excel</button>
+                    <button type="button" class="btn btn-secondary" style="margin-bottom: 3px;display:none;" id="clearFilterBtn" onclick="clearFilter()">Clear Filter</button>
+                    <input class="form-check-input InputCheckbox" type="checkbox" asp-for="IsDamagedQuantity" id="isDamagedQuantity">
+                    <label asp-for="IsDamagedQuantity" class="form-label"> </label>
+                    <input class="form-check-input InputCheckbox" type="checkbox" asp-for="IsMarketplaceQuantity" id="isMarketplaceQuantity">
+                    <label asp-for="IsMarketplaceQuantity" class="form-label"> </label>
+                </div>
+            </div>
+            <div class="datatable-container">
+                <table id="dataTable" class="table datatable-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" data-column="srNo" onclick="sortTable('srNo')"><button class="datatable-sorter">#</button></th>
+                            <th rowspan="2" data-column="masterSKU" onclick="sortTable('masterSKU')"><button class="datatable-sorter th-SKU">Mst SKU</button></th>
+                            <th rowspan="2" data-column="title" onclick="sortTable('title')"><button class="datatable-sorter th-title">Title</button></th>
+                            <th rowspan="2" data-column="mappingSKU" onclick="sortTable('mappingSKU')"><button class="datatable-sorter th-MappingSKU">Marketplace SKU</button></th>
+                            <th rowspan="2" data-column="ean" onclick="sortTable('ean')"><button class="datatable-sorter">EAN</button></th>
+                            <th rowspan="2" data-column="gtin" onclick="sortTable('gtin')"><button class="datatable-sorter">GTIN</button></th>                          
+
+                            <th class="colspan-textalign" colspan="5" id="quantityGroup">Quantity</th>
+                            <th class="colspan-textalign" colspan="2" id="damagedGroup">Damaged Quantity</th>
+                            <th rowspan="2" data-column="avgCost" onclick="sortTable('avgCostPrice')"><button class="datatable-sorter th-avgCostPrice">Avg. Cost(£)</button></th>
+                            <th rowspan="2" data-column="shippingFee" onclick="sortTable('shippingFee')"><button class="datatable-sorter th-shippingFee">Shipping Fees(£)</button></th>
+                            <th class="colspan-textalign" colspan="5" id="marketplaceGroup">Marketplace Quantity</th>                            
+                        </tr>
+                        <tr>
+                            <th data-column="fba" onclick="sortTable('fba')"><button class="datatable-sorter">FBA Greenwize</button></th>
+                            <th data-column="fbaavaSupplies" onclick="sortTable('fbaavaSupplies')"><button class="datatable-sorter">FBA AVA Supplies</button></th>
+                            <th data-column="amershamQty" onclick="sortTable('amershamQty')"><button class="datatable-sorter">Amersham</button></th>
+                            <th data-column="watfordQty" onclick="sortTable('watfordQty')"><button class="datatable-sorter">Watford</button></th>
+                            <th data-column="totalQty" onclick="sortTable('totalQty')"><button class="datatable-sorter">Total</button></th>
+
+                            <th data-column="damagedAmershamQty" onclick="sortTable('damagedAmershamQty')"><button class="datatable-sorter">Amersham</button></th>
+                            <th data-column="damagedWatfordQty" onclick="sortTable('damagedWatfordQty')"><button class="datatable-sorter">Watford</button></th>
+
+                            <th data-column="amazonQty" onclick="sortTable('amazonQty')"><button class="datatable-sorter">Amazon Greenwize</button></th>
+                            <th data-column="amazonQtyAVASupplies" onclick="sortTable('amazonQtyAVASupplies')"><button class="datatable-sorter">Amazon AVA Supplies</button></th>
+                            <th data-column="eBayQty" onclick="sortTable('eBayQty')"><button class="datatable-sorter">eBay</button></th>
+                            <th data-column="onBuyQty" onclick="sortTable('onBuyQty')"><button class="datatable-sorter">OnBuy</button></th>
+                            <th data-column="shopifyQty" onclick="sortTable('shopifyQty')"><button class="datatable-sorter">Shopify</button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="datatable-bottom">
+                <div class="datatable-info" id="datatableInfo"></div>
+                <nav class="datatable-pagination">
+                    <ul class="datatable-pagination-list" id="pagination">
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="quantityManageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form class="needs-validation modelform" id="quantityManage" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalQuantityTitle">Add Product Stock</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="quantityManageBody">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="modalQuantitySubmit"><span class="spinner-border spinner-border-sm" id="quantitySubmitLoader" style="display:none"></span> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="damagedQuantityManageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form class="needs-validation modelform" id="damagedQuantityManage" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalDamagedQuantityTitle">Manage damaged quantity</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="damagedQuantityManageBody">
+                    <div class="row p-3">
+                        <div class="col-md-12 pb-2">
+                            <h6><b>Mst SKU:</b> <span id="skuValueDamagedQuantity"></span></h6>
+                            <h6><b>Title:</b> <span id="titleValueDamagedQuantity"></span></h6>
+                        </div>
+                        <div class="col-md-12 pb-2">
+                            <label for="amershamDamagedQuantity" class="form-label">Amersham Quantity:</label>
+                            <input type="number" min="1" name="amershamDamagedQuantity" class="form-control" for="amershamDamagedQuantity" id="modalAmershamDamagedQuantity">
+                            <div class="invalid-feedback">Please enter a valid amersham damaged quantity.</div>
+                        </div>
+
+                        <div class="col-md-12 pb-2">
+                            <label for="watfordDamagedQuantity" class="form-label">Watford Quantity:</label>
+                            <input type="number" min="1" name="watfordDamagedQuantity" class="form-control" for="watfordDamagedQuantity" id="modalWatfordDamagedQuantity">
+                            <div class="invalid-feedback">Please enter a valid watford damaged quantity.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="modalDamagedQuantitySubmit"><span class="spinner-border spinner-border-sm" id="damagedQuantitySubmitLoader" style="display:none"></span> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="productCostManageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form class="needs-validation modelform" id="productCostManage" novalidate>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalProductCostTitle">Add Product Cost</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="productCostManageBody">
+                    <div class="row p-3">
+                        <div class="col-md-12 pb-2">
+                            <h6><b>Mst SKU:</b> <span id="skuValueProductCost"></span></h6>
+                            <h6><b>Title:</b> <span id="titleValueProductCost"></span></h6>
+                        </div>
+                        <div class="col-md-12 pb-2">
+                            <label for="productCost" class="form-label">Product Cost (£): *</label>
+                            <input type="number" min="0.00001" step="0.00001" name="productCost" class="form-control" for="productCost" id="modalProductCostValue" required>
+                            <div class="invalid-feedback">Please enter a valid product cost.</div>
+                        </div>
+
+                        <div class="col-md-12 pb-2">
+                            <label for="productCostDate" class="form-label">Date: *</label>
+                            <input type="date" class="form-control" id="modalProductCostDate" required>
+                            <div class="invalid-feedback">Please select a valid date.</div>
+                        </div>
+                      
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="modalProductCostSubmit"><span class="spinner-border spinner-border-sm" id="productCostSubmitLoader" style="display:none"></span> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Quantity modal form submission validation
+            const formQuantityManage = document.querySelector('#quantityManage');
+            const submitButton = document.getElementById('modalQuantitySubmit');
+
+            submitButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!formQuantityManage.checkValidity()) {
+                    formQuantityManage.classList.add('was-validated');
+                } else {
+                    formQuantityManage.classList.remove('was-validated');
+
+                    AddQuantity();
+                }
+            });
+
+            // Damaged Quantity modal form submission validation
+            const formDamagedQuantityManage = document.querySelector('#damagedQuantityManage');
+            const submitButtonDamagedQuantity = document.getElementById('modalDamagedQuantitySubmit');
+
+            submitButtonDamagedQuantity.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!formDamagedQuantityManage.checkValidity()) {
+                    formDamagedQuantityManage.classList.add('was-validated');
+                } else {
+                    formDamagedQuantityManage.classList.remove('was-validated');
+
+                    //Add damaged quantity
+                    AddDamagedQuantity();
+                }
+            });
+
+            // Add Product Cost modal form submission validation
+            const formProductCostManage = document.querySelector('#productCostManage');
+            const submitButtonProductCost = document.getElementById('modalProductCostSubmit');
+
+            submitButtonProductCost.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!formProductCostManage.checkValidity()) {
+                    formProductCostManage.classList.add('was-validated');
+                } else {
+                    formProductCostManage.classList.remove('was-validated');
+
+                    AddProductCost();
+                }
+            });
+
+        }, false);
+        var showTitleBaseUrl = '@showTitleBaseUrl';
+        let loadTimeInventoryData = [];
+        let inventoryData = [];
+        let supplierNameArray = [];
+        function clearFilter() {
+
+            // Remove URL parameters using history.replaceState to keep the page without reloading
+            let url = new URL(window.location.href); // Get the current URL
+            url.search = ""; // Clear the search parameters (URL parameters)
+            history.replaceState(null, "", url.toString()); // Replace the current URL with the updated one
+
+            // Reload the page with the new URL (without parameters)
+            location.reload();
+        }
+
+        $(document).ready(function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            sku = new URLSearchParams(window.location.search).get('sku');
+            marketSku = new URLSearchParams(window.location.search).get('marketSku');
+
+            if (sku || marketSku) {
+                document.getElementById('clearFilterBtn').style.display = 'inline-block';
+               
+                if(sku){
+                    document.getElementById('search').value = sku;
+                    //GetMasterInventory(sku);
+                }
+                else
+                {
+                    // document.getElementById('search').value = marketSku;
+                    // GetMasterInventoryByMarketSKU(marketSku);
+                }
+                GetMasterInventory(sku, marketSku);
+               
+            }
+            else {
+                //Function call
+                GetMasterInventory(sku, marketSku);
+            }
+
+            $("#isDamagedQuantity, #isMarketplaceQuantity").on("change", function () {
+                const sku = new URLSearchParams(window.location.search).get("sku");
+                const marketSku = new URLSearchParams(window.location.search).get("marketSku");
+                GetMasterInventory(sku, marketSku);
+            });
+
+            //For autosearch suggestion
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetSupplierNames", "MasterInventory")",
+                dataType: "json",
+                success: function (response) {
+                    supplierNameArray = response;
+                },
+                failure: function (response) {
+                    console.error(response.responseText);
+                },
+                error: function (response) {
+                    console.error(response.responseText);
+                }
+            });
+        })
+
+        //Function to fetch master inventory data.
+        // function GetMasterInventory() {
+
+        //     // Show spinner and hide buttons
+        //     $('#table-loading-spinner').removeClass('d-none');
+
+        //     $.ajax({
+        //         url: '@Url.Action("GetMasterInventory", "MasterInventory")',
+        //         method: 'GET',
+        //         dataType: 'json',
+        //         success: function (response) {
+        //             // Hide spinner and show buttons
+        //             $('#table-loading-spinner').addClass('d-none');
+
+        //             if (!response.isError) {
+        //                 const dataWithSrNo = response.result.map((item, index) => ({
+        //                     srNo: index + 1, // serial number starting from 1
+        //                     ...item ,
+        //                     minSellingPrice: item.minSellingPrice.toFixed(2),
+        //                     maxSellingPrice: item.maxSellingPrice.toFixed(2),
+        //                     _30daysSellingPrice: item._30daysSellingPrice.toFixed(2),
+        //                     _60daysSellingPrice: item._60daysSellingPrice.toFixed(2),
+        //                     _90daysSellingPrice: item._90daysSellingPrice.toFixed(2)
+        //                 }));
+        //                 inventoryData = dataWithSrNo;
+        //                 loadTimeInventoryData = dataWithSrNo;
+        //                 //Display the data in the table.
+        //                 displayTable(dataWithSrNo)
+        //             } else {
+        //                 toastr.error(response.message);
+        //             }
+        //         },
+        //         error: function (error) {
+        //             $('#table-loading-spinner').addClass('d-none');
+        //             console.error('Error fetching data:', error);
+        //         }
+        //     });
+        // }
+
+        //Function to fetch master inventory data.
+        function GetMasterInventory(sku, marketSku) {
+
+            // Show spinner and hide buttons
+            $('#table-loading-spinner').removeClass('d-none');
+
+            $.ajax({
+                url: '@Url.Action("GetMasterInventory", "MasterInventory")',
+                method: 'GET',
+                data: { sku: sku, 
+                        marketSku: marketSku,
+                        isDamagedQuantity: $("#isDamagedQuantity").is(":checked"),
+                        isMarketplaceQuantity: $("#isMarketplaceQuantity").is(":checked")
+                },
+                dataType: 'json',
+                success: function (response) {
+                    // Hide spinner and show buttons
+                    $('#table-loading-spinner').addClass('d-none');
+
+                    if (!response.isError) {
+                        const dataWithSrNo = response.result.map((item, index) => ({
+                            srNo: index + 1, // serial number starting from 1
+                            ...item
+                        }));
+                        inventoryData = dataWithSrNo;
+                        loadTimeInventoryData = dataWithSrNo;
+                        //Display the data in the table.
+                        displayTable(dataWithSrNo)
+
+                        toggleColumns();
+
+                    } else {
+                        toastr.error(response.message);
+                    }
+                },
+                error: function (error) {
+                    $('#table-loading-spinner').addClass('d-none');
+                    console.error('Error fetching data:', error);
+                }
+            });
+        }
+
+        function escapeString(str) {
+            // Escape single quotes, double quotes, backslashes, and other characters if necessary
+            return str.replace(/\\/g, '\\\\') // Escape backslashes
+                .replace(/'/g, "\\'") // Escape single quotes
+                .replace(/"/g, '\\"')  // Escape double quotes
+                .replace(/\n/g, '\\n')  // Escape newlines
+                .replace(/\r/g, '\\r'); // Escape carriage returns
+        }
+
+        let currentPage = 1;
+        let rowsPerPage = parseInt(document.getElementById('perPageSelector').value);
+
+        //Function to display table with pagination.
+        function displayTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                const noDataMessage = document.createElement('tr');
+                if (loadTimeInventoryData.length === 0) {
+                    noDataMessage.innerHTML = '<td class="datatable-empty" colspan="20">No entries found</td>';
+                } else {
+                    noDataMessage.innerHTML = '<td class="datatable-empty" colspan="20">No results match your search query</td>';
+                }
+                tableBody.appendChild(noDataMessage);
+
+                updatePagination(0);
+                updateInfo(0, 0, 0);
+                return;
+
+            } else {
+                const query = document.getElementById('search').value.trim().toLowerCase();
+
+                if (isNullOrEmpty(query)) {
+                    inventoryData = loadTimeInventoryData;
+                } else {
+                    const filteredData = loadTimeInventoryData.filter(row => {
+                        return Object.values(row).some(value => value?.toString().toLowerCase().includes(query));
+                    });
+
+                    inventoryData = filteredData;
+                }
+
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                const paginatedData = inventoryData.slice(start, end);
+
+                paginatedData.forEach(row => {
+                    const tr = document.createElement('tr');
+
+                    const title = escapeString(row.title);
+
+                    const marketplaceIcons = {
+                        amazongreenwize: `<img src="/iconimage/IconAmazonGreenwize.png"/>`,
+                        amazonavasupplies: `<img src="/iconimage/IconAmazonAVASupplies.png"/>`,
+                        ebaygreenwize: `<svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="35" height="35" viewBox="0 0 48 48" style="padding-bottom: 3px;">
+                                        <path fill="#f44336" d="M6,19c-6.002-0.001-6.029,4.529-5.998,5.704c0,0-0.294,5.296,6.058,5.296c5.458,0,5.726-3.323,5.726-3.323l-2.51,0.005c0,0-0.489,1.831-3.205,1.781C2.579,28.4,2.443,25,2.443,25H12C12,24.999,12.643,19.001,6,19z M2.523,23.515c0,0,0.172-2.965,3.624-2.966c3.44-0.001,3.44,2.966,3.44,2.966H2.523z"></path><path fill="#1976d2" d="M18.825,19c-3.058-0.017-4.374,1.719-4.374,1.719V15H12v15h2.316l0.102-1.735c0,0,1.111,1.735,4.356,1.735c3.246,0,5.809-1.898,5.878-5.416C24.719,21.064,21.884,19.016,18.825,19z M18.264,28.431c-3.862,0.046-3.799-3.888-3.799-3.888s-0.141-3.873,3.793-3.97c3.933-0.097,3.875,4.051,3.875,4.051S22.126,28.384,18.264,28.431z"></path><path fill="#8bc34a" d="M34.437 19L37.243 19 41.349 27.185 45.463 19 48 19 40.573 34 37.859 34 40.009 29.537z"></path><path fill="#ffc107" d="M30.724,19.017c0,0-4.883-0.416-5.544,2.983h2.588c0.132-0.415,0.674-1.469,2.785-1.431c2.484,0.044,2.937,1.003,2.923,2.431c0,0-2.129,0.006-2.84,0.009c-1.28,0.006-5.761,0.345-6.179,2.945c-0.498,3.093,2.399,4.058,4.666,4.045c2.266-0.012,3.559-0.659,4.52-1.818l0.103,1.83L36,30v-6.805C35.936,22.032,36,19.224,30.724,19.017z M29.546,28.511c0,0-2.456,0.003-2.6-1.867c-0.154-1.996,3.778-2.078,3.778-2.078l2.778-0.003C33.501,24.564,33.951,28.567,29.546,28.511z"></path>
+                                        </svg>`,
+                        onbuygreenwize: `<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 32 32" style="padding-bottom: 4px;">
+                                        <path d="M0 0 C10.56 0 21.12 0 32 0 C32 10.56 32 21.12 32 32 C21.44 32 10.88 32 0 32 C0 21.44 0 10.88 0 0 Z " fill="#3769CD" transform="translate(0,0)"/>
+                                        <path d="M0 0 C0.99 1.32 1.98 2.64 3 4 C5.29738569 6.85192706 6.26760483 7.89091987 9.9375 8.4375 C13.29987194 7.95716115 15.24591819 6.94405774 18 5 C18 6.32 18 7.64 18 9 C19.65 9 21.3 9 23 9 C23 6.36 23 3.72 23 1 C23.99 1 24.98 1 26 1 C26 3.64 26 6.28 26 9 C27.65 9 29.3 9 31 9 C31 6.36 31 3.72 31 1 C31.33 1 31.66 1 32 1 C32 6.28 32 11.56 32 17 C21.44 17 10.88 17 0 17 C0 11.39 0 5.78 0 0 Z " fill="#3466CC" transform="translate(0,15)"/>
+                                        <path d="M0 0 C3.80484394 0.71340824 5.4511805 1.6388541 8 4.5625 C8.625 8 8.625 8 8 11.5625 C5.55401113 14.94371991 4.10703441 16.33186783 0 17.1875 C-4.0743356 16.33868008 -5.54405875 14.88524404 -8 11.5625 C-8.625 8.5625 -8.625 8.5625 -8 5.5625 C-5.53959272 2.23371368 -4.10389613 0.76948052 0 0 Z " fill="#F2F5FB" transform="translate(10,7.4375)"/>
+                                        <path d="M0 0 C1 1 1 1 1.09765625 3.28515625 C1.08605469 4.20167969 1.07445312 5.11820313 1.0625 6.0625 C1.05347656 6.98160156 1.04445313 7.90070312 1.03515625 8.84765625 C1.02355469 9.55792969 1.01195312 10.26820312 1 11 C-0.32 11 -1.64 11 -3 11 C-3 8.36 -3 5.72 -3 3 C-3.99 3 -4.98 3 -6 3 C-6 5.64 -6 8.28 -6 11 C-7.32 11 -8.64 11 -10 11 C-10 7.37 -10 3.74 -10 0 C-5.66473162 -0.86705368 -4.00869538 -1.11352649 0 0 Z " fill="#E8EDF9" transform="translate(29,13)"/>
+                                        <path d="M0 0 C1.99954746 -0.04254356 4.00041636 -0.04080783 6 0 C7 1 7 1 7.125 4 C7 7 7 7 6 8 C4.00041636 8.04080783 1.99954746 8.04254356 0 8 C-1.125 2.25 -1.125 2.25 0 0 Z " fill="#3B6CCE" transform="translate(7,12)"/>
+                                        <path d="M0 0 C1.67542976 0.28604898 3.34385343 0.61781233 5 1 C5 4.3 5 7.6 5 11 C3.68 11 2.36 11 1 11 C1 8.03 1 5.06 1 2 C0.34 1.67 -0.32 1.34 -1 1 C-0.67 0.67 -0.34 0.34 0 0 Z " fill="#F0F4FB" transform="translate(25,13)"/>
+                                        </svg>`,
+                        shopifygreenwize: `<svg width="18px" height="18px" viewBox="-18 0 292 292" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid" style="padding-bottom: 4px;">
+                                          <path d="M223.774 57.34c-.201-1.46-1.48-2.268-2.537-2.357-1.055-.088-23.383-1.743-23.383-1.743s-15.507-15.395-17.209-17.099c-1.703-1.703-5.029-1.185-6.32-.805-.19.056-3.388 1.043-8.678 2.68-5.18-14.906-14.322-28.604-30.405-28.604-.444 0-.901.018-1.358.044C129.31 3.407 123.644.779 118.75.779c-37.465 0-55.364 46.835-60.976 70.635-14.558 4.511-24.9 7.718-26.221 8.133-8.126 2.549-8.383 2.805-9.45 10.462C21.3 95.806.038 260.235.038 260.235l165.678 31.042 89.77-19.42S223.973 58.8 223.775 57.34zM156.49 40.848l-14.019 4.339c.005-.988.01-1.96.01-3.023 0-9.264-1.286-16.723-3.349-22.636 8.287 1.04 13.806 10.469 17.358 21.32zm-27.638-19.483c2.304 5.773 3.802 14.058 3.802 25.238 0 .572-.005 1.095-.01 1.624-9.117 2.824-19.024 5.89-28.953 8.966 5.575-21.516 16.025-31.908 25.161-35.828zm-11.131-10.537c1.617 0 3.246.549 4.805 1.622-12.007 5.65-24.877 19.88-30.312 48.297l-22.886 7.088C75.694 46.16 90.81 10.828 117.72 10.828z" fill="#95BF46"/><path d="M221.237 54.983c-1.055-.088-23.383-1.743-23.383-1.743s-15.507-15.395-17.209-17.099c-.637-.634-1.496-.959-2.394-1.099l-12.527 256.233 89.762-19.418S223.972 58.8 223.774 57.34c-.201-1.46-1.48-2.268-2.537-2.357" fill="#5E8E3E"/><path d="M135.242 104.585l-11.069 32.926s-9.698-5.176-21.586-5.176c-17.428 0-18.305 10.937-18.305 13.693 0 15.038 39.2 20.8 39.2 56.024 0 27.713-17.577 45.558-41.277 45.558-28.44 0-42.984-17.7-42.984-17.7l7.615-25.16s14.95 12.835 27.565 12.835c8.243 0 11.596-6.49 11.596-11.232 0-19.616-32.16-20.491-32.16-52.724 0-27.129 19.472-53.382 58.778-53.382 15.145 0 22.627 4.338 22.627 4.338" fill="#FFF"/>
+                                          </svg>`
+                    };
+
+                    // Combine mappingSKUs with their corresponding marketplace and icon
+                    const mappingSKUs = (row.mappingSKU || '').split(',').map(sku => sku.trim());
+                    const marketplaces = (row.salesChannel || '').split(',').map(market => market.trim());
+                    const count = Math.min(mappingSKUs.length, marketplaces.length);
+
+                    const mappedSKUsWithIcons = Array.from({ length: count }).map((_, idx) => {
+                        const sku = mappingSKUs[idx];
+                        const market = marketplaces[idx].trim().replace(/\s+/g, '');
+                        const icon = marketplaceIcons[market] || '';
+                        return `${icon}${sku}`;
+                    }).join(', ');
+
+                    //let avgCostPriceContent = row.avgCostPrice ? `${row.avgCostPrice} <i class="bi bi-caret-down-fill"></i>` : '';
+                    let avgCostPriceContent = `<div class="td-sections">
+                                               <div class="section-left">${row.avgCostPrice || ''}</div>
+                                                       <div class="section-right avg-cost-control">
+                                                    ${row.avgCostPrice ? `<i class="bi bi-caret-down-fill"></i>` : ''}                                                  
+                                               </div>
+                                               <div class="section-right">
+                                                    <i class="bx bxs-plus-square" style="color: green;cursor: pointer" onclick="AvgCostSwitchButtonClick('${row.masterSKU}', '${title}')" title="Add Product Cost"></i>
+                                               </div>
+                                        </div>`;
+
+                    let totalQuantityRowContent =
+                        `<div class="td-sections">
+                            <div class="section-right">
+                            <div class="section-left">${row.totalQty || ''}</div>
+                                <div class="btn-group" role="group" style="display: flex; gap: 5px; align-items: center;">
+                                    <i class="bx bxs-plus-square" style="color: green;cursor: pointer" 
+                                    onclick="QuantityButtonClick('increase', '${row.masterSKU}', '${title}')" title="Increase Quantity"></i>
+                                    <i class="bx bxs-minus-square" style="color: red;cursor: pointer" 
+                                    onclick="QuantityButtonClick('decrease', '${row.masterSKU}', '${title}')" title="Decrease Quantity"></i>                                   
+                                 </div>
+                              </div>
+                         </div>`
+
+                    let watfordDamageQuantityRowContent =
+                        `<div class="td-sections">
+                                       <div class="section-left">${row.damagedWatfordQty || ''}</div>
+                                       <div class="section-right">
+                                           <div class="btn-group" role="group">
+                                                <i class="bx bxs-plus-square" style="color: green;cursor: pointer" onclick="DamagedQuantityButtonClick('increase', '${row.masterSKU}', '${title}')" title="Increase Damaged Quantity"></i>
+                                                <i class="bx bxs-minus-square" style="color: red;cursor: pointer" onclick="DamagedQuantityButtonClick('decrease', '${row.masterSKU}', '${title}')" title="Decrease Damaged Quantity"></i>
+                                           </div>
+                                       </div>
+                                </div>`
+
+                    tr.innerHTML = `
+                                <td data-column="srNo">${row.srNo}</td>
+                                <td data-column="masterSKU"><span class="mst-details-control"> ${row.masterSKU ? row.masterSKU : ''}<i class="bi bi-caret-down-fill"></i></span></td>
+                                <td data-column="title" class="title"><p><a href="${showTitleBaseUrl}?sku=${row.masterSKU}" title="Click to Show Mapping SKU" target="_blank">${row.title || ''}</a></p></td>
+                                <td data-column="mappingSKU">${mappedSKUsWithIcons || ''}</td>          
+                                <td data-column="ean">${row.ean || ''}</td>
+                                <td data-column="gtin">${row.gtin || ''}</td>
+                                <td data-column="fba">${row.fba || ''}</td>
+                                <td data-column="fbaavaSupplies">${row.fbaavaSupplies || ''}</td>
+                                <td data-column="amershamQty">${row.amershamQty || ''}</td>
+                                <td data-column="watfordQty">${row.watfordQty || ''}</td>
+                                <td data-column="totalQty">${totalQuantityRowContent}</td>
+                                <td data-column="damagedAmershamQty">${row.damagedAmershamQty || ''}</td>
+                                <td data-column="damagedWatfordQty">${watfordDamageQuantityRowContent}</td>
+                                <td data-column="avgCost"><span class="">${avgCostPriceContent}</span></td>
+                                <td data-column="shippingFee" class="td-sections">
+                                    <div class="section-left">
+                                        <input class="form-control" type="text" value="${row.shippingFee || ''}" data-row="${row.masterSKU}" style="width:100px"/>
+                                    </div>
+                                    <div class="section-right">
+                                        <button class="btn btn-outline-primary update-btn" title = "Click to Add Shipping Fee" data-row="${row.masterSKU}" style="margin-left:5px"><i class="bi bi-save"></i></button>
+                                    </div>
+                                </td>
+                                <td data-column="amazonQty">${row.amazonQty || ''}</td>
+                                <td data-column="amazonQtyAVASupplies">${row.amazonQtyAVASupplies || ''}</td>
+                                <td data-column="eBayQty">${row.eBayQty || ''}</td>
+                                <td data-column="onBuyQty">${row.onBuyQty || ''}</td>
+                                <td data-column="shopifyQty">${row.shopifyQty || ''}</td>                                                      
+                            `;
+                    tableBody.appendChild(tr);
+                });
+                
+                $(document).on('mouseenter', '.title', function () {
+                    const $this = $(this);
+                    if ($this.width() < $this[0].scrollWidth) {
+                        $this.css('white-space', 'normal');
+                    }
+                });
+                $(document).on('mouseleave', '.title', function () {
+                    const $this = $(this);
+                    $this.css('white-space', 'nowrap');
+                });
+
+                // Event listener for display Activity log
+                $(document).off('click', '.mst-details-control').on('click', '.mst-details-control', function () {
+                    const masterSKU = $(this).text().trim(); // Get the master SKU value
+                    const $tr = $(this).closest('tr'); // Get the closest table row
+                    const rowIndex = $tr.index();
+                    // Get the index of the row
+                    const rowData = data[rowIndex]; // Get the corresponding data row
+                    // Function call
+                    handleMasterSKUClick(masterSKU, $tr, rowData);
+                });
+
+                // Event listener for display Avg cost history
+                $(document).off('click', '.avg-cost-control').on('click', '.avg-cost-control', function () {
+                    const $tr = $(this).closest('tr'); // Get the closest table row
+                    const masterSKUValue = $tr.find('td:nth-child(2)').text();
+
+                    // Function call
+                    handleAvgCostClick(masterSKUValue, $tr)
+                });
+
+                if (!isNullOrEmpty(query)) {
+                    updatePagination(inventoryData.length);
+                    updateInfo(inventoryData.length, start + 1, Math.min(end, inventoryData.length));
+                }
+                else 
+                {
+                    updatePagination(data.length);
+                    updateInfo(data.length, start + 1, Math.min(end, data.length));
+                }
+                
+            }
+        }
+
+        // Function to update shippingFee based on masterSKU
+        function updateShippingFee(masterSKU, newShippingFee) {
+            // Find the object with the matching masterSKU
+            const item = inventoryData.find(fee => fee.masterSKU === masterSKU);
+
+            // If found, update the shipping fee
+            if (item) {
+                item.shippingFee = newShippingFee;
+                console.log(`Shipping fee for ${masterSKU} updated to ${newShippingFee}`);
+            } else {
+                console.log(`No entry found for masterSKU: ${masterSKU}`);
+            }
+        }
+
+        document.getElementById('dataTable').addEventListener('click', function (event) {
+            if (event.target && event.target.closest('.update-btn')) {
+
+                const button = event.target.closest('.update-btn');
+                // Get the row number from the button's data-row attribute
+                const masterSKU = button.getAttribute('data-row');
+
+                // Get the input field in the same row using the data-row attribute
+                const inputField = document.querySelector(`input[data-row='${masterSKU}']`);
+
+                // Get the value of the input field
+                const inputValue = inputField.value.trim();
+                if (!inputValue) {
+                    toastr.warning('Please enter a value.');
+                    return;
+                }
+
+                // Check if the input is a valid decimal
+                if (isNaN(inputValue) || !inputValue.match(/^\d+(\.\d+)?$/)) {
+                    toastr.warning('Please enter a valid decimal value.');
+                    return;
+                }
+
+                // Ajax call
+                $.ajax({
+                    url: '@Url.Action("AddShippingFees", "MasterInventory")',
+                    method: 'POST',
+                    data: { masterSKU: masterSKU, shippingFees: inputValue },
+                    success: function (response) {
+                        if (!response.isError) {
+                            updateShippingFee(masterSKU, inputValue)
+                            toastr.success(response.message);
+                        } else {
+                            toastr.error(response.message);
+                        }
+                    },
+                    error: function (error) {
+                        console.error('Error on adding shipping fees.', error);
+                    }
+                });
+
+            }
+        });
+
+        function isInputValid(inputValue) {
+            if (inputValue !== null && inputValue !== "") {
+                return true; // Input is not null or empty
+            } else {
+                return false; // Input is null or empty
+            }
+        }
+
+        // Quantity add/reduce modal submit event
+        function AddQuantity() {
+            const modalAmershamQuantity = document.getElementById("modalAmershamQuantity").value.trim();
+            const modalWatfordQuantity = document.getElementById("modalWatfordQuantity").value.trim();
+
+            if (!isInputValid(modalAmershamQuantity) && !isInputValid(modalWatfordQuantity)) {
+                toastr.warning('At least one of the warehouse quantities (Amersham or Watford) is required.');
+                return;
+            }
+           
+            let data =null;
+            let operation = 'increase';
+            let reduceQuantityReason = '';
+
+            // reduce quantity reason element find time reduce operation
+            const reduceQuantityReasonElement = document.getElementById("reduceQuantityReason");
+            if (reduceQuantityReasonElement !== null) {
+                reduceQuantityReason = reduceQuantityReasonElement.value.trim();
+                operation = 'reduce';
+            }
+
+            const skuValueQuantity = document.getElementById("skuValueQuantity").textContent.trim();
+            const modalProductCost = document.getElementById("modalProductCost").value.trim();
+
+            let modalSupplierName = null;
+            const modalSupplierNameElement = document.getElementById("modalSupplierName");
+            if (modalSupplierNameElement !== null) {
+                modalSupplierName = modalSupplierNameElement.value.trim();
+            }
+
+            data = {
+                sku: skuValueQuantity, operation: operation, amershamQuantity: modalAmershamQuantity, 
+                watfordQuantity: modalWatfordQuantity, productCost: modalProductCost, supplierName: modalSupplierName,
+                reduceQuantityReason: reduceQuantityReason};
+            
+            document.getElementById('modalQuantitySubmit').disabled = true;
+            document.getElementById('quantitySubmitLoader').style.display = 'inline-block';
+
+            // Ajax call
+            $.ajax({
+                url: '@Url.Action("ManageWarehouseQuantity", "MasterInventory")',
+                method: 'POST',
+                data: data,
+                success: function (response) {
+                    if (!response.isError) {
+                        toastr.success(response.message);
+
+                        GetMasterInventory();                     
+
+                        setTimeout(function () {
+                            $('#quantityManageModal').modal('hide')
+                        }, 2000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+
+                    document.getElementById('modalQuantitySubmit').disabled = false;
+                    document.getElementById('quantitySubmitLoader').style.display = 'none';
+                },
+                error: function (error) {
+                    console.error('Error on adding quantities.', error);
+                    document.getElementById('modalQuantitySubmit').disabled = false;
+                    document.getElementById('quantitySubmitLoader').style.display = 'none';
+                }
+            });
+        }       
+
+        // Damaged quantity add/reduce modal submit event
+        function AddDamagedQuantity() {
+
+            const modalAmershamDamagedQuantity = document.getElementById("modalAmershamDamagedQuantity").value.trim();
+            const modalWatfordDamagedQuantity = document.getElementById("modalWatfordDamagedQuantity").value.trim();
+
+            if (!isInputValid(modalAmershamDamagedQuantity) && !isInputValid(modalWatfordDamagedQuantity)) {
+                toastr.warning('At least one of the warehouse damaged quantities (Amersham or Watford) is required.');
+                return;
+            }
+            ``
+            let operation = 'increase';
+            if ($('#modalDamagedQuantityTitle').text().toLowerCase().includes('reduce')) {
+                operation = 'reduce';
+            }
+
+            const skuValueDamagedQuantity = document.getElementById("skuValueDamagedQuantity").textContent.trim();
+
+            const data = {
+                sku: skuValueDamagedQuantity, operation: operation,
+                amershamDamagedQuantity: modalAmershamDamagedQuantity, watfordDamagedQuantity: modalWatfordDamagedQuantity }
+
+            document.getElementById('modalDamagedQuantitySubmit').disabled = true;
+            document.getElementById('damagedQuantitySubmitLoader').style.display = 'inline-block';
+
+            // Ajax call
+            $.ajax({
+                url: '@Url.Action("ManageWarehouseDamagedQuantity", "MasterInventory")',
+                method: 'POST',
+                data: data,
+                success: function (response) {
+                    if (!response.isError) {
+                        toastr.success(response.message);
+
+                        GetMasterInventory();
+
+                        setTimeout(function () {
+                            $('#damagedQuantityManageModal').modal('hide')
+                        }, 2000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+
+                    document.getElementById('modalDamagedQuantitySubmit').disabled = false;
+                    document.getElementById('damagedQuantitySubmitLoader').style.display = 'none';
+                },
+                error: function (error) {
+                    console.error('Error on adding damaged quantities.', error);
+
+                    document.getElementById('modalDamagedQuantitySubmit').disabled = false;
+                    document.getElementById('damagedQuantitySubmitLoader').style.display = 'none';
+                }
+            });
+        }
+
+        // Product cost add modal submit event
+        function AddProductCost() {
+
+            const productCost = document.getElementById("modalProductCostValue").value.trim();
+            const selectedDate = document.getElementById("modalProductCostDate").value.trim();
+            const selectedSKU = document.getElementById("skuValueProductCost").textContent.trim();
+
+            const data = {
+                sku: selectedSKU, productCost: productCost, date: selectedDate              
+            }
+
+            document.getElementById('modalProductCostSubmit').disabled = true;
+            document.getElementById('productCostSubmitLoader').style.display = 'inline-block';
+
+            // Ajax call
+            $.ajax({
+                url: '@Url.Action("AddProductCost", "MasterInventory")',
+                method: 'POST',
+                data: data,
+                success: function (response) {
+                    if (!response.isError) {
+                        toastr.success(response.message);
+
+                        GetMasterInventory();
+
+                        setTimeout(function () {
+                            $('#productCostManageModal').modal('hide')
+                        }, 2000);
+                    } else {
+                        toastr.error(response.message);
+                    }
+
+                    document.getElementById('modalProductCostSubmit').disabled = false;
+                    document.getElementById('productCostSubmitLoader').style.display = 'none';
+                },
+                error: function (error) {
+                    console.error('Error on adding damaged quantities.', error);
+
+                    document.getElementById('modalProductCostSubmit').disabled = false;
+                    document.getElementById('productCostSubmitLoader').style.display = 'none';
+                }
+            });
+        }
+
+        // Quantity manage '+-' button click event
+        function QuantityButtonClick(operation, sku, title) {
+            let reasonHTML = '';
+            let productCostHTML = '<input type="number" name="productCost" class="form-control" for="productCost" id="modalProductCost" style="display:none" >';
+            // Stock reduce click
+            if (operation == 'decrease') {
+                reasonHTML = `<div class="col-md-12 pb-2">
+                             <label for="reduceQuantityReason" class="form-label">Stock Reduce Reason: *</label>
+                             <input type="text" name="reduceQuantityReason" class="form-control" for="reduceQuantityReason" id="reduceQuantityReason" required>
+                             <div class="invalid-feedback">Please enter the stock reduce reason.</div>
+                         </div>`;
+
+                $('#modalQuantityTitle').text('Reduce Product Stock');
+            }else{  // Add stock click
+                $('#modalQuantityTitle').text('Add Product Stock');
+                productCostHTML = `<div class="col-md-6 pb-2">
+                                        <label for="productCost" class="form-label">Product Cost (£): *</label>
+                                        <input type="number" min="0.00001" step="0.00001" name="productCost" class="form-control" for="productCost" id="modalProductCost" required>
+                                        <div class="invalid-feedback">Please enter a valid product cost.</div>
+                                    </div>
+                                    <div class="col-md-6 pb-2">
+                                        <label for="supplierName" class="form-label">Supplier Name: *</label>
+                                        <input type="text" name="supplierName" class="typeahead_suppliernames form-control" for="supplierName" id="modalSupplierName" autocomplete="off" required>
+                                        <div class="invalid-feedback">Please enter a supplier name.</div>
+                                    </div>`;
+            }
+
+            const bodyContent =
+                ` <div class="row p-3">
+                            <div class="col-md-12 pb-2">
+                                <h6><b>Mst SKU:</b> <span id="skuValueQuantity">${sku}</span></h6>
+                                <h6><b>Title:</b> <span>${title}</span></h6>
+                            </div>
+
+                            <div class="col-md-6 pb-2">
+                                <label for="amershamQuantity" class="form-label">Amersham Quantity:</label>
+                                <input type="number" min="1" name="amershamQuantity" class="form-control" for="amershamQuantity" id="modalAmershamQuantity">
+                                <div class="invalid-feedback">Please enter a valid amersham quantity.</div>
+                            </div>
+
+                            <div class="col-md-6 pb-2">
+                                <label for="watfordQuantity" class="form-label">Watford Quantity:</label>
+                                <input type="number" min="1" name="watfordQuantity" class="form-control" for="watfordQuantity" id="modalWatfordQuantity">
+                                <div class="invalid-feedback">Please enter a valid watford quantity.</div>
+                            </div>
+                            ${productCostHTML}
+                            ${reasonHTML}
+                        </div>`;
+
+            
+            $('#quantityManageBody').html(bodyContent);
+            const myModal = new bootstrap.Modal(document.getElementById('quantityManageModal'));
+            myModal.show();
+
+            $('.typeahead_suppliernames').typeahead({
+                source: supplierNameArray
+            });
+        } 
+
+        // Damaged Quantity manage '+-' button click event
+        function DamagedQuantityButtonClick(operation, sku, title) {
+            if (operation == 'decrease') {
+                $('#modalDamagedQuantityTitle').text('Reduce Damaged Product Stock');
+            } else {
+                $('#modalDamagedQuantityTitle').text('Add Damaged Product Stock');
+            }
+
+            $('#skuValueDamagedQuantity').text(sku);
+            $('#titleValueDamagedQuantity').text(title);
+
+            const myModal = new bootstrap.Modal(document.getElementById('damagedQuantityManageModal'));
+            myModal.show();
+        }
+
+        // Product cost value manage '+' button click event
+        function AvgCostSwitchButtonClick(sku, title) {
+            $('#skuValueProductCost').text(sku);
+            $('#titleValueProductCost').text(title);
+
+            const myModal = new bootstrap.Modal(document.getElementById('productCostManageModal'));
+            myModal.show();
+        }
+
+        // Quantity manage modal close event
+        document.getElementById('quantityManageModal').addEventListener('hidden.bs.modal', function () {
+            const quantityManageForm = document.querySelector('#quantityManage');
+            quantityManageForm.classList.remove('was-validated');
+            quantityManageForm.reset();
+
+            $('.typeahead_suppliernames').typeahead('destroy');
+        });
+
+        // Damaged Quantity manage modal close event
+        document.getElementById('damagedQuantityManageModal').addEventListener('hidden.bs.modal', function () {
+            const damagedQuantityManageForm = document.querySelector('#damagedQuantityManage');
+            damagedQuantityManageForm.classList.remove('was-validated');
+            damagedQuantityManageForm.reset();
+        });
+
+        // Add product cost modal close event
+        document.getElementById('productCostManageModal').addEventListener('hidden.bs.modal', function () {
+            const productCostManageForm = document.querySelector('#productCostManage');
+            productCostManageForm.classList.remove('was-validated');
+            productCostManageForm.reset();
+        });
+
+        //Function to update pagination controls.
+        function updatePagination(totalRows) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+            if (totalRows === 0) {
+                return;
+            }
+
+            // Previous button
+            if (currentPage > 1) {
+                const prevButton = createPaginationButton('‹', currentPage - 1);
+                pagination.appendChild(prevButton);
+            } else {
+                const prevButton = createPaginationButton('‹', currentPage - 1, true);
+                pagination.appendChild(prevButton);
+            }
+
+            // Show first 7 pages
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) {
+                    const button = createPaginationButton(i, i, false, i === currentPage);
+                    pagination.appendChild(button);
+                }
+            } else {
+                // Always show the first page
+                pagination.appendChild(createPaginationButton(1, 1, false, currentPage === 1));
+
+                // Show ellipsis after the first 7 pages if needed
+                if (currentPage > 5) {
+                    pagination.appendChild(createPaginationButton('...', 0, true));
+                }
+
+                // Calculate start and end pages for the middle section
+                let startPage = Math.max(2, currentPage - 2);
+                let endPage = Math.min(totalPages - 1, currentPage + 2);
+
+                // Adjust start and end pages if close to the beginning or end
+                if (currentPage <= 5) {
+                    startPage = 2;
+                    endPage = Math.min(7, totalPages - 1);
+                }
+                if (currentPage >= totalPages - 4) {
+                    startPage = Math.max(totalPages - 6, 2);
+                    endPage = totalPages - 1;
+                }
+
+                // Show middle pages
+                for (let i = startPage; i <= endPage; i++) {
+                    const button = createPaginationButton(i, i, false, i === currentPage);
+                    pagination.appendChild(button);
+                }
+
+                // Show ellipsis before the last page if needed
+                if (currentPage < totalPages - 4) {
+                    pagination.appendChild(createPaginationButton('...', 0, true));
+                }
+
+                // Always show the last page
+                if (totalPages > 1) {
+                    pagination.appendChild(createPaginationButton(totalPages, totalPages, false, currentPage === totalPages));
+                }
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                const nextButton = createPaginationButton('›', currentPage + 1);
+                pagination.appendChild(nextButton);
+            } else {
+                const nextButton = createPaginationButton('›', currentPage + 1, true);
+                pagination.appendChild(nextButton);
+            }
+        }
+
+        //Function to create a pagination button.
+        function createPaginationButton(text, page, disabled = false, active = false) {
+            const li = document.createElement('li');
+            li.className = 'datatable-pagination-list-item';
+            if (disabled) li.classList.add('datatable-disabled');
+            if (active) li.classList.add('datatable-active');
+
+            const button = document.createElement('button');
+            button.textContent = text;
+            button.dataset.page = page;
+            button.disabled = disabled;
+            button.onclick = () => {
+                if (!disabled) {
+                    currentPage = page;
+                    displayTable(inventoryData);
+                }
+            };
+
+            li.appendChild(button);
+            return li;
+        }
+
+        function updateInfo(totalRows, start, end) {
+            const info = document.getElementById('datatableInfo');
+            if (totalRows === 0) {
+                info.textContent = '';
+            } else {
+                info.textContent = `Showing ${start} to ${end} of ${totalRows} entries`;
+            }           
+        }
+
+        //Function to sort the table by a specified column.
+        let previousSortColumn = null;
+        function sortTable(column) {
+            const table = document.getElementById('dataTable');
+            const headers = table.querySelectorAll('th');
+            
+            headers.forEach(header => {
+                const headerColumn = header.getAttribute('data-column');
+                if (headerColumn === column) {
+                    const currentSort = header.getAttribute('aria-sort');
+                    const newSort = currentSort === 'ascending' ? 'descending' : 'ascending';
+                    header.setAttribute('aria-sort', newSort);
+                    header.classList.toggle('datatable-ascending', newSort === 'ascending');
+                    header.classList.toggle('datatable-descending', newSort === 'descending');
+                } else {
+                    header.removeAttribute('aria-sort');
+                    header.classList.remove('datatable-ascending', 'datatable-descending');
+                }
+            });
+
+            let direction = document.getElementById('dataTable').dataset.sortDirection === 'ascending' ? 'descending' : 'ascending';
+
+            if (column != previousSortColumn) {
+                direction = 'ascending';
+            }
+
+            table.dataset.sortDirection = direction;
+            previousSortColumn = column;
+
+            inventoryData.sort((a, b) => {
+                const valueA = a[column] || '';
+                const valueB = b[column] || '';
+
+                // Check if values are numbers
+                const isValueANumber = !isNaN(parseFloat(valueA));
+                const isValueBNumber = !isNaN(parseFloat(valueB));
+
+                if (isValueANumber && isValueBNumber) {
+                    // Compare as numbers
+                    return direction === 'ascending' ? valueA - valueB : valueB - valueA;
+                } else {
+                    // Compare as strings
+                    const strA = valueA.toString().toLowerCase();
+                    const strB = valueB.toString().toLowerCase();
+                    if (strA < strB) {
+                        return direction === 'ascending' ? -1 : 1;
+                    }
+                    if (strA > strB) {
+                        return direction === 'ascending' ? 1 : -1;
+                    }
+                    return 0;
+                }
+            });
+            currentPage = 1;
+            displayTable(inventoryData);
+            toggleColumns();
+        }
+
+        //Function for the searching functinality in the table.
+        function searchTable() {
+         
+            const query = document.getElementById('search').value.trim().toLowerCase();
+            
+            if (isNullOrEmpty(query)) {
+                inventoryData = loadTimeInventoryData;
+            } else {
+                const filteredData = loadTimeInventoryData.filter(row => {
+                    return Object.values(row).some(value => value?.toString().toLowerCase().includes(query));
+                });
+                inventoryData = filteredData;
+            }
+            currentPage = 1;
+
+            displayTable(inventoryData);
+            toggleColumns();
+        }
+
+        function isNullOrEmpty(value) {
+            return value === null || value === undefined || value === '' || (typeof value === 'string' && value.trim() === '');
+        }
+
+        function exportExcel() {
+            // Export to Excel functionality
+            const hideDamaged = $("#isDamagedQuantity").is(":checked");
+            const hideMarketplace = $("#isMarketplaceQuantity").is(":checked");
+
+            const mappedInventoryData = inventoryData.map((row, index) => {
+                const mappingSKUs = row.mappingSKU?.split(',') || [];
+                const salesChannels = row.salesChannel?.split(',') || [];
+
+                const formattedMappingSKUs = mappingSKUs.map((sku, i) =>
+                    `${sku.trim()} (${(salesChannels[i] || '').trim()})`
+                ).join(', ');
+
+                const rowArray = [row.srNo, row.masterSKU, row.title, formattedMappingSKUs, row.ean, row.gtin, row.fba, 
+                    row.fbaavaSupplies, row.amershamQty, row.watfordQty, row.totalQty];
+
+                if (!hideDamaged) {
+                    rowArray.push(row.damagedAmershamQty, row.damagedWatfordQty);
+                }
+
+                rowArray.push(row.avgCostPrice, row.shippingFee);
+
+                if (!hideMarketplace) {
+                    rowArray.push(row.amazonQty, row.amazonQtyAVASupplies, row.eBayQty, row.onBuyQty, row.shopifyQty);
+                }
+
+                return rowArray;
+            });
+
+            const header = ["#", "Mst SKU", "Title", "Marketplace SKU", "EAN", "GTIN", "FBA Greenwize Quantity", 
+                "FBA AVA Supplies Quantity", "Amersham Quantity", "Watford Quantity", "Total Quantity"];
+
+            if (!hideDamaged) {
+                header.push("Amersham Damaged Quantity", "Watford Damaged Quantity");
+            }
+
+            header.push("Avg. Cost(£)", "Shipping Fees(£)");
+
+            if (!hideMarketplace) {
+                header.push("Amazon Greenwize Quantity", "Amazon AVA Supplies Quantity", "eBay Quantity", "OnBuy Quantity", "Shopify Quantity");
+            }
+
+            const combinedArray = [header, ...mappedInventoryData
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+            // Define columns for specific formats
+            const numberColumns = [];
+            const decimalColumns = [];
+
+            combinedArray[0].forEach((colName, i) => {
+                if (["FBA Greenwize Quantity", "FBA AVA Supplies Quantity", "Amersham Quantity", "Watford Quantity", 
+                    "Total Quantity", "Amersham Damaged Quantity", "Watford Damaged Quantity", "Amazon Greenwize Quantity", 
+                    "Amazon AVA Supplies Quantity", "eBay Quantity", "OnBuy Quantity", "Shopify Quantity"].includes(colName)) {
+                    numberColumns.push(i);
+                }
+                if (["Avg. Cost(£)", "Shipping Fees(£)"].includes(colName)) {
+                    decimalColumns.push(i);
+                }
+            });
+
+            Object.keys(ws).forEach((cell) => {
+                if (!cell.startsWith('!')) {
+                    const { c } = XLSX.utils.decode_cell(cell);
+                    if (numberColumns.includes(c) && !isNaN(ws[cell].v)) {
+                        ws[cell].t = 'n';
+                        ws[cell].z = '0';
+                    }
+                    if (decimalColumns.includes(c) && !isNaN(ws[cell].v)) {
+                        ws[cell].t = 'n';
+                        ws[cell].z = '0.00';
+                    }
+                }
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+            saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'Master Inventory.xlsx');
+        }
+
+        // Utility function to convert data to array buffer
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xff;
+            }
+            return buf;
+        }
+
+        document.getElementById('perPageSelector').addEventListener('change', (event) => {
+            rowsPerPage = parseInt(event.target.value);
+            currentPage = 1;  // Reset to first page
+            displayTable(inventoryData);
+        });
+
+        function isNumber(evt, element) {
+            var charCode = (evt.which) ? evt.which : event.keyCode;
+            var inputValue = $(element).val();
+
+            // Allow only digits (0-9) and backspace
+            if ((charCode < 48 || charCode > 57) && charCode !== 8) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function safeParseInt(value) {
+            const parsedValue = parseInt(value, 10);
+            return isNaN(parsedValue) ? 0 : parsedValue;
+        }
+
+        function handleMasterSKUClick(masterSKU, tr, rowData) {
+
+            if (tr.hasClass('shown')) {
+                // Closing the already opened row
+                tr.next('tr.child-row').remove();
+                tr.removeClass('shown');
+            }
+            else {
+
+                let data = { masterSKU: masterSKU }
+                if (typeof (masterSKU) !== "undefined" && masterSKU !== null) {
+                    $.ajax({
+                        type: "GET",
+                        data: data,
+                        url: '@Url.Action("GetMasterInventoryLog", "MasterInventory")',
+                        dataType: "json",
+                        success: function (data) {
+                            if (!data.isError) {
+                                let tableHtml = getMasterSKUChildRow(data, "Activity Log");
+                                // Append the generated table HTML as a child row
+                                tr.after(`<tr class="child-row"><td colspan="20">${tableHtml}</td></tr>`);
+                                tr.addClass('shown');
+                            } else {
+                                toastr.error(data.message);
+                            }
+                        },
+                        error: function () {
+                            toastr.error('An error occurred while fetching logs.');
+                        }
+                    });
+                }
+            }
+        }
+
+        function handleAvgCostClick(masterSKU, tr) {
+
+            if (tr.hasClass('shown')) {
+                // Closing the already opened row
+                tr.next('tr.child-row').remove();
+                tr.removeClass('shown');
+            }
+            else {
+
+                let data = { masterSKU: masterSKU }
+                if (typeof (masterSKU) !== "undefined" && masterSKU !== null) {
+                    $.ajax({
+                        type: "GET",
+                        data: data,
+                        url: '@Url.Action("GetStockLocationHistory", "MasterInventory")',
+                        dataType: "json",
+                        success: function (data) {
+                            if (!data.isError) {
+
+                                let rows = '';
+                                if (data.result.length > 0) {
+                                    // data.result.sort((a, b) => new Date(b.dateAdd) - new Date(a.dateAdd));
+                                    for (const stock of data.result) {
+                                        rows += `<tr>
+                                                    <td style="width:180px">${stock.stockLocation}</td>
+                                                    <td style="width:180px">${stock.quantity}</td>
+                                                    <td style="width:250px"><input class="form-control costprice-input" type="text" onkeypress="return isNumberAndDecimal(event, this)" value="${stock.costPrice}" /></td>
+                                                    <td style="width:400px">${stock.supplierName ?? ''}</td>
+                                                    <td style="width:300px"><input class="form-control date-input" type="date" value="${formatDate(stock.dateAdd)}" data-original-date="${formatDate(stock.dateAdd)}"></td>
+                                                    <td>
+                                                        <button class="btn btn-primary update-button" id="${stock.idStockLocationHistory}" title="Update">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    </td>
+                                                 </tr>`;
+                                    }
+                                } else {
+                                    rows += '<tr><td colspan="6">No entries found</td></tr>';
+                                }
+
+                                let tableHtml = `<table style="width:100%" class="table table-striped table-bordered table-hover">
+                                                 <thead>
+                                                     <tr>
+                                                       <th style="width:180px">StockLocation</th>
+                                                       <th style="width:180px">Quantity</th>
+                                                       <th style="width:250px">CostPrice</th>
+                                                       <th style="width:400px">SupplierName</th>
+                                                       <th style="width:300px">Date</th>
+                                                       <th>Action</th>
+                                                    </tr>
+                                                 </thead>
+                                                 <tbody>${rows}</tbody>
+                                             </table>`;
+
+                                // Append the generated table HTML as a child row
+                                tr.after(`<tr class="child-row"><td colspan="20">${tableHtml}</td></tr>`);
+                                tr.addClass('shown');
+                            } else {
+                                toastr.error(data.message);
+                            }
+                        },
+                        error: function () {
+                            toastr.error('An error occurred while fetching logs.');
+                        }
+                    });
+                }
+            }
+        }
+
+        // Function to handle update button click
+        document.addEventListener("click", function (event) {
+            if (event.target.closest(".update-button")) {
+                const button = event.target.closest(".update-button"); // Get the clicked button
+                const row = button.closest("tr"); // Get the row containing the button
+
+                // Extract values from input fields in the same row
+                const costprice = row.querySelector(".costprice-input").value;
+                const idStockLocationHistory = row.querySelector(".update-button").getAttribute("id");
+                const dateInput = row.querySelector(".date-input");
+                const newDate = dateInput.value;
+                const originalDate = dateInput.getAttribute("data-original-date"); // Get original date
+
+                if (!isValidDecimal(costprice)) {
+                    toastr.error("Invalid CostPrice value!");
+                    return;
+                }
+               
+                // Check if the date has changed
+                let isDateChange = false;
+                if (newDate !== originalDate) {
+                    isDateChange = true;
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: "@Url.Action("UpdateCostAndDate", "MasterInventory")",
+                    data: { idStockLocationHistory, costprice, isDateChange, newDate },
+                    success: function (response) {
+                        if (response.isError) {
+                            toastr.error(response.message);
+                        } else {
+                            toastr.success(response.message);
+                        }
+                    },
+                    failure: function (response) {
+                        console.error(response.responseText);
+                    },
+                    error: function (error) {
+                        console.error('Error updating record:', error);
+                    }
+                });
+
+            }
+        });
+
+        function isValidDecimal(value) {
+            return value !== null && value !== "" && !isNaN(value) && isFinite(value) && parseFloat(value) == value;
+        }
+
+        /* Function for child row details*/
+        function getMasterSKUChildRow(data, ecom_name) {                    
+
+            // Sort the logs based on the parsed timestamp in descending order
+            data.result.sort((a, b) => new Date(b.dateAdd) - new Date(a.dateAdd));
+ 
+            let rows = '';
+            if (data.result.length > 0) {
+                for (const log of data.result) {
+                    rows += `<tr><td>${log.logMessage}</td></tr>`;
+                }
+            } else {
+                rows += '<tr><td colspan="2">No entries found</td></tr>';
+            }
+
+            let tableHtml = `<table  style="width:100%" class="table table-striped table-bordered table-hover">
+                                 <thead>
+                                     <tr>
+                                       <th>${ecom_name} </th>
+                                    </tr>
+                                 </thead>
+                                 <tbody>${rows}</tbody>
+                             </table>`;
+            return tableHtml;
+        }
+
+        function isNumber(evt, element) {
+            var charCode = (evt.which) ? evt.which : event.keyCode;
+            var inputValue = $(element).val();
+
+            // Allow only digits (0-9) and backspace
+            if ((charCode < 48 || charCode > 57) && charCode !== 8) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return ""; // Handle empty dates
+            const date = new Date(dateString);
+            // Convert to YYYY-MM-DD format
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // Add leading zero
+            const day = String(date.getDate()).padStart(2, '0'); // Add leading zero
+            return `${year}-${month}-${day}`;
+        }
+
+        function isNumberAndDecimal(evt, element) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            var value = element.value;
+            var dotContains = value.indexOf('.') !== -1;
+            if (dotContains && charCode == 46) {
+                return false;
+            }
+            if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 46) {
+                return false;
+            }
+            return true;
+        }
+
+        function toggleColumn(columnKey, visible) {
+            const table = document.getElementById("dataTable");
+
+            table.querySelectorAll(`th[data-column="${columnKey}"]`)
+                .forEach(th => th.style.display = visible ? "" : "none");
+
+            table.querySelectorAll(`td[data-column="${columnKey}"]`)
+                .forEach(td => td.style.display = visible ? "" : "none");
+        }
+
+        function getColumnIndex(columnKey) {
+            const ths = document.querySelectorAll("#dataTable thead tr:last-child th");
+            for (let i = 0; i < ths.length; i++) {
+                if (ths[i].dataset.column === columnKey) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function updateGroup(groupSelector, childColumns) {
+            const group = document.querySelector(groupSelector);
+            let count = 0;
+
+            childColumns.forEach(col => {
+                const th = document.querySelector(`#dataTable thead tr:last-child th[data-column="${col}"]`);
+                if (th && th.style.display !== "none") {
+                    count++;
+                }
+            });
+
+            if (count === 0) {
+                group.style.display = "none";
+            } else {
+                group.style.display = "";
+                group.colSpan = count;
+            }
+        }
+
+        function toggleColumns() {
+            const hideDamaged = $("#isDamagedQuantity").is(":checked");
+            const hideMarketplace = $("#isMarketplaceQuantity").is(":checked");
+
+            toggleColumn("damagedAmershamQty", !hideDamaged);
+            toggleColumn("damagedWatfordQty", !hideDamaged);
+            updateGroup("#damagedGroup", ["damagedAmershamQty", "damagedWatfordQty"]);
+
+            toggleColumn("amazonQty", !hideMarketplace);
+            toggleColumn("amazonQtyAVASupplies", !hideMarketplace);
+            toggleColumn("eBayQty", !hideMarketplace);
+            toggleColumn("onBuyQty", !hideMarketplace);
+            toggleColumn("shopifyQty", !hideMarketplace);
+            updateGroup("#marketplaceGroup", ["amazonQty", "amazonQtyAVASupplies", "eBayQty", "onBuyQty", "shopifyQty"]);
+        }
+      
+    </script>
+}

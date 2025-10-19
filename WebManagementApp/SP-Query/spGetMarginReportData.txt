@@ -12,12 +12,12 @@ CREATE PROCEDURE dbo.spGetMarginReportData
     @ToDate DATE,
     @StoreName NVARCHAR(100), 
     @BrandName NVARCHAR(100), 
+    @CategoryName NVARCHAR(100),
 	@CompanyName NVARCHAR(100) 
 AS
 BEGIN
 
-    SET NOCOUNT ON;
-    SELECT 
+      SELECT 
         m.SKU AS MasterSKU, 
         m.Title,
         m.Image, 
@@ -29,8 +29,9 @@ BEGIN
         s.SalesChannel,
 		s.CompanyName,
         s.Price AS SellingPrice,
-        mp.BundleQuantity as BundleQty,
-        sl.TotalAvgCostPrice as TotalAvgCostPrice,
+		mp.BundleQuantity as  BundleQty,
+		sl.TotalAvgCostPrice as TotalAvgCostPrice,
+		s.FulfillmentChannel,
 		CASE 
         WHEN s.FulfillmentChannel = 'fulfillment-inbound' THEN 0
         ELSE 
@@ -48,9 +49,17 @@ BEGIN
 			ELSE NULL
 			END
 		END AS Fees,
+		CAST(ROUND(AVG(ISNULL(s.ReferralFee, 0)), 2) AS DECIMAL(10,2)) AS ReferralFee,
+		CAST(ROUND(AVG(ISNULL(s.VariableClosingFee, 0)), 2) AS DECIMAL(10,2)) AS VariableClosingFee,
+		CAST(ROUND(AVG(ISNULL(s.FBAFees, 0)), 2) AS DECIMAL(10,2)) AS FBAFees,
+		CAST(ROUND(AVG(ISNULL(s.ShippingFee, 0)), 2) AS DECIMAL(10,2)) AS ShippingFee,
+		CAST(ROUND(AVG(ISNULL(s.FinalValueFee, 0)), 2) AS DECIMAL(10,2)) AS FinalValueFee,
+		CAST(ROUND(AVG(ISNULL(s.ListingFee, 0)), 2) AS DECIMAL(10,2)) AS ListingFee,
+		CAST(ROUND(AVG(ISNULL(s.TransactionFee, 0)), 2) AS DECIMAL(10,2)) AS TransactionFee,
+		CAST(ROUND(AVG(ISNULL(s.BoostFee, 0)), 2) AS DECIMAL(10,2)) AS BoostFee,
+		CAST(ROUND(AVG(ISNULL(s.SalesFee, 0)), 2) AS DECIMAL(10,2)) AS SalesFee,
         SUM(s.Quantity) AS UnitSold, 
         CASE 
-			
             WHEN LOWER(mp.SalesChannel) = 'amazon' THEN 
 				CASE 
 					WHEN LOWER(ai.Source) = 'gb' THEN CONCAT('https://amazon.co.uk/dp/', ai.ASIN)
@@ -70,7 +79,7 @@ BEGIN
             ELSE NULL
         END AS ProductURL
     FROM 
-        (SELECT idMasterSKU, SKU, Title, Image, ProductCost, idBrand, GTIN, EAN FROM tblMasterSKU) AS m
+        (SELECT idMasterSKU, SKU, Title, Image, ProductCost, idBrand,idCategory, GTIN, EAN FROM tblMasterSKU) AS m
     INNER JOIN (SELECT idMappingSKU, idMasterSKU, SKU, SalesChannel, CompanyName, Quantity AS BundleQuantity FROM FN_GetTblMappingSKUWithBundleQuantity()) AS mp 
         ON m.idMasterSKU = mp.idMasterSKU
 
@@ -88,23 +97,12 @@ BEGIN
         GROUP BY mp.SKU, mp.CompanyName, mp.SalesChannel
     ) sl ON mp.SKU = sl.SKU 
         AND mp.SalesChannel = sl.SalesChannel
-		AND (LOWER(mp.CompanyName) = LOWER(sl.CompanyName)
-		--LOWER(mp.SalesChannel) != 'amazon' OR LOWER(mp.CompanyName) = LOWER(sl.CompanyName)
-		)
-
-	--LEFT JOIN (
-	--		SELECT idMasterSKU, AvgCostPrice
-	--		FROM (
-	--			SELECT idMasterSKU, AvgCostPrice, ModifyTime,
-	--				   ROW_NUMBER() OVER (PARTITION BY idMasterSKU ORDER BY ModifyTime DESC) AS row_num
-	--			FROM tblStockLocation
-	--			--WHERE LOWER(CompanyName) = LOWER(@CompanyName)
-	--		) sl
-	--		WHERE row_num = 1 -- Selects the latest record based on ModifyTime
-	--) sl ON m.idMasterSKU = sl.idMasterSKU
-
+		AND (LOWER(mp.CompanyName) = LOWER(sl.CompanyName) -- remove companyname from stock 
+		) -- remove companyname from stock 
     LEFT JOIN (SELECT idBrand, Brand FROM tblBrand) AS b 
         ON m.idBrand = b.idBrand 
+    LEFT JOIN (SELECT idCategory, CategoryName FROM tblCategory) AS c
+        ON m.idCategory = c.idCategory 
     LEFT JOIN (SELECT SKU, ASIN, CompanyName, Source FROM tblAmazonInventory WHERE Source = 'GB' AND 
 		(LOWER(@CompanyName) = 'all' OR LOWER(CompanyName) = LOWER(@CompanyName))) AS ai 
         ON mp.SKU = ai.SKU AND LOWER(mp.SalesChannel) = 'amazon' AND LOWER(ai.CompanyName) = LOWER(mp.CompanyName) 
@@ -123,13 +121,12 @@ BEGIN
 			   )) AS s 
         ON mp.SKU = s.MarketplaceSKU 
         AND LOWER(mp.SalesChannel) = LOWER(s.SalesChannel) 
-		AND (LOWER(mp.CompanyName) = LOWER(s.CompanyName)
-			--LOWER(mp.SalesChannel) != 'amazon'
-			--OR LOWER(mp.CompanyName) = LOWER(s.CompanyName)
-		)
+		AND (LOWER(mp.CompanyName) = LOWER(s.CompanyName))
         AND CAST(s.OrderDate AS DATE) BETWEEN @FromDate AND @ToDate 
 		AND (LOWER(@CompanyName) = 'all' OR LOWER(s.CompanyName) = LOWER(@CompanyName)) 
-    WHERE (@BrandName = 'All' OR LOWER(b.Brand) = LOWER(@BrandName)) -- Apply filter for brand name
+    WHERE (@BrandName = 'All'  OR LOWER(b.Brand) IN (SELECT LOWER(TRIM(value)) FROM STRING_SPLIT(@BrandName, ',')))
+    AND (@CategoryName = 'All' OR LOWER(c.CategoryName) IN ( SELECT LOWER(TRIM(value)) FROM STRING_SPLIT(@CategoryName, ',') ))
+	--(@BrandName = 'All' OR LOWER(b.Brand) IN( LOWER(@BrandName))) -- Apply filter for brand name
 	AND Quantity > 0 AND (FulfillmentChannel IS NULL OR FulfillmentChannel IN ('merchant', 'amazon')) 
 	AND (LOWER(s.SalesChannel) != 'amazon'
          OR (LOWER(s.SalesChannel) = 'amazon' AND (LOWER(s.Source) = 'gb' OR s.Source IS NULL))) 

@@ -22,6 +22,7 @@
         public string FBAAVASupplies { get; set; }
         public List<BrandList> brandNameList { get; set; }
         public List<SalesChannelList> salesChannelList { get; set; }
+        public List<CategoryModel> categorylList { get; set; }
     }
 
     public class StockAgingDataHistory

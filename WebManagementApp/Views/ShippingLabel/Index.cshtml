@@ -1,0 +1,448 @@
+﻿@model WebManagementApp.Models.ShippingLabelModel
+@{
+    ViewData["Title"] = "Shipping Label Page";
+}
+
+@if (ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" id="alertMessage" role="alert">
+        @ViewBag.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewBag.SuccessMessage != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" id="alertMessage" role="alert">
+        @ViewBag.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@section Styles {
+    <style>
+        .table-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #idbtnSave {
+            margin-top: 32px;
+        }
+
+        #button_cancel{
+            width: 82px;
+            margin-top: 32px;
+        }
+
+        .btnCancle {
+            display: none;
+        }
+
+        @@media screen and (max-width: 555px) {
+            .positionrow {
+                position: absolute !important;
+            }
+        }
+
+        @@media screen and (max-width: 767px) {
+            #idbtnSave {
+                margin-top: 4px;
+            }
+
+            #button_cancel{
+                margin-top: 4px;
+            }
+
+            .btnCancle{
+                margin-top: 4px;
+            }
+        }
+ 
+        @@media screen and (max-width: 540px) {
+            .datatable-input 
+            {
+                width: 40% !important;
+            }
+        }
+
+        table thead {
+            position: sticky;
+            top: 60px;
+            z-index: 1;
+        }
+    </style>
+}
+<div class="positionrow">
+    <div class="card">
+        <div class="card-body">
+            <div class="col-lg-12">
+                <form asp-controller="ShippingLabel" asp-action="Index" method="post" class="row mt-2 needs-validation" id="form1" style="padding-top:10px" novalidate>
+                    <input type="hidden" asp-for="idShippingLabel" id="input_idShippingLabel" />
+                    <input type="hidden" id="mode" name="Mode" value="Add" />
+                    <div class="col-md-4 col-sm-12 mb-2">
+                        <label for="inputState" class="form-label">Shipping Label Name:<span style="color:black">*</span></label>
+                        <input type="text" class="form-control" asp-for="ShippingLabelName" id="input_shippingLabel"
+                               placeholder="Enter Shipping Label Name" onkeypress=" return Whitespace(event)" required>
+                        <div class="invalid-feedback">
+                            Please enter shipping label name.
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-sm-12 mb-2">
+                        <label for="inputState" class="form-label">Shipping Rate:<span style="color:black">*</span></label>
+                        <input type="text" class="form-control" asp-for="ShippingRate" id="input_rate"
+                               placeholder="Enter Shipping Rate" onkeypress="return isNumberAndDecimal(event,this)" required>
+                        <div class="invalid-feedback">
+                            Please enter shipping rate.
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-start">
+                            @if (ViewBag.Mode == "Update")
+                            {
+                                <button type="submit" class="btn btn-primary" id="idbtnSave">Update</button>
+                                <button type="button" class="btn btn-secondary" id="button_cancel">Cancel</button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-primary" id="idbtnSave">Add</button>
+                            }
+                            <button type="button" class="btn btn-secondary btnCancle" id="button_cancel">Cancel</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="card ">
+        <div class="card-body mt-2">
+            <table id="shippingLabel-table" class="table">
+            </table>
+
+            <div id="table-spinner" class="table-overlay">
+                <div class="spinner-border" role="status">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+            GetShippingLabels();
+            setTimeout(function () {
+                $("#alertMessage").fadeOut();
+            }, 5000);
+        });
+
+        let _ShippingLabelId = null;
+        let _ShippingLabelDatatable = null;
+        let _ShippingLabelData = null;
+
+        function GetShippingLabels() {
+            $.ajax({
+                type: "GET",
+                url: "@Url.Action("GetShippingLabels", "ShippingLabel")",
+                dataType: "json",
+                success: function (response) {
+                    if (response.error) {
+                        toastr.error(response.message);
+                    } else {
+
+                        GenerateShippingLabelTable(response.result);
+                    }
+                    $('#table-spinner').addClass('d-none');
+                },
+                error: function (error) {
+                    $('#table-loading-spinner').addClass('d-none');
+                    toastr.error('Error fetching data: ' + error.responseText);
+                }
+            });
+        }
+
+        function GenerateShippingLabelTable(data) {
+            if (_ShippingLabelDatatable) {
+                _ShippingLabelDatatable.destroy();
+            }
+
+            _ShippingLabelData = data.map((row, index) => [
+                row.idShippingLabel,
+                row.shippingLabelName ? row.shippingLabelName : '',
+                row.shippingRate ? row.shippingRate : '',
+                row.dateAdd ? formatDateTime(row.dateAdd) : '', 
+                `<div class="btn-group gap-2" role="group" aria-label="Product Actions">
+                    <div>
+                       <button type="button" class="btn btn-primary editLabel" id="${row.idShippingLabel}"
+                            data-bs-toggle="tooltip" data-bs-placement="bottom" title="Edit Label"
+                              onclick="editLabel('${row.idShippingLabel}', '${row.shippingLabelName ? row.shippingLabelName.replace(/'/g, "\\'") : ''}', '${row.shippingRate ? row.shippingRate : ''}')">
+                              <i class="bi bi-pencil-square editLabel"></i>
+                       </button>
+                    </div>
+                    <div>
+                       <button type="button" class="btn btn-danger removeLabel" id="${row.idShippingLabel}"
+                           data-bs-toggle="tooltip" data-bs-placement="bottom" title="Delete Label" onclick="removeLabel(this.id)">
+                           <i class="bi bi-trash delete"></i>
+                        </button>
+                     </div>
+                </div>`
+
+            ]);
+
+            _ShippingLabelDatatable = new simpleDatatables.DataTable($('#shippingLabel-table')[0], {
+                data: {
+                    headings: ["Shipping Label Name", "Shipping Rate", "DateAdd", "Action"],
+                    data: _ShippingLabelData.map(row => [row[1], row[2], row[3], row[4]])
+                },
+                rowRender: (rowValue, tr, _index) => {
+                    if (!tr.attributes) {
+                        tr.attributes = {}
+                    }
+
+                    $('tr.child-row').remove();
+                    $('tr').removeClass('shown');
+
+                    tr.attributes["data-id"] = _ShippingLabelData[_index][0];
+
+                    return tr
+                },
+                perPage: 20, 
+                perPageSelect: [20, 40, 60],
+                columns: [
+                    {
+                        select: 3,
+                        sortable: false,
+                    }
+                ],
+            });
+
+            //
+            var searchDiv = document.querySelector(".datatable-search");
+            var button = document.createElement("button");
+            button.innerText = "Export Excel";
+            button.type = "button";
+            button.id = "export-excel-button";
+            button.className = "btn btn-secondary";
+            button.style.marginBottom = "3px";
+            button.onclick = function () {
+                const heading = ["Shipping Label Name", "Shipping Rate", "DateAdd"];
+
+                //Set column indexes as per the productTableData headings
+                const columnIndexes = {
+                    ShippingLabelName: 1,
+                    ShippingRate: 2,
+                    DateAdd: 3
+                };
+
+                let excelData = [];
+                if (_ShippingLabelDatatable.totalPages > 0) {
+                    const indexes = Object.values(columnIndexes).map(index => index - 1); // Convert to zero-based indexes
+
+                    excelData = _ShippingLabelDatatable.pages.map(group =>
+                        group.map(item =>
+                            item.row.cells
+                                .map(cell => cell.text)
+                                .filter((_, cellIndex) => indexes.includes(cellIndex)) // Select only the desired columns
+                        )
+                    ).flat();
+                }
+
+                // Get table data
+                let combinedArray = [heading, ...excelData];
+                const ws = XLSX.utils.aoa_to_sheet(combinedArray);
+
+                // Define columns for specific formats
+                const numberColumns = [4, 5, 6]; // Columns that need to be numbers
+
+                // Loop through the worksheet rows to apply formats to specified columns
+                Object.keys(ws).forEach((cell) => {
+                    if (!cell.startsWith('!')) { // Skip worksheet metadata
+                        const { c } = XLSX.utils.decode_cell(cell); // Get the column index (0-based)
+
+                        // Check if the column is in the number list
+                        if (numberColumns.includes(c + 1) && !isNaN(ws[cell].v)) { // Convert to 1-based index for comparison
+                            ws[cell].t = 'n'; // Set cell type to 'number'
+                            ws[cell].z = '0'; // Format as integer
+                        }
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
+                saveAs(new Blob([s2ab(wbout)], { type: "application/octet-stream" }), 'ShippingLabel.xlsx');
+            };
+            searchDiv.appendChild(button);
+        }
+
+        function editLabel(idShippingLabel, shippingLabelName, shippingRate) {
+            
+            document.getElementById('input_shippingLabel').value = shippingLabelName;
+            document.getElementById('input_rate').value = shippingRate;
+
+            document.getElementById('input_idShippingLabel').value = idShippingLabel;
+
+            document.getElementById('idbtnSave').textContent = 'Update';
+
+            var form = $('#form1');
+
+            form.removeClass('was-validated');
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.text-danger').text('');
+
+            document.getElementById('mode').value = 'Update';
+            $('#button_cancel').show();
+        }
+        //On cancel click
+        $('#button_cancel').on('click', function () {
+
+            var form = $('#form1');
+            form[0].reset();
+            form.removeClass('was-validated');
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.text-danger').text('');
+
+            document.getElementById('input_shippingLabel').value = '';
+
+            document.getElementById('input_rate').value = '';
+            document.getElementById('input_idShippingLabel').value = '';
+
+            document.getElementById('idbtnSave').textContent = "Add";
+
+            $('#button_cancel').hide();
+        });
+
+        function removeLabel(idShippingLabel) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+
+                    $.ajax({
+                        url: '@Url.Action("DeleteLabel", "ShippingLabel")',
+                        type: 'POST',
+                        data: { idShippingLabel: idShippingLabel },
+                        success: function (response) {
+                            
+                            if (response.error) {
+                                Swal.fire(
+                                    'Error!',
+                                    response.message,
+                                    'error'
+                                );
+                            } else {
+                                Swal.fire(
+                                    'Deleted!',
+                                    response.message,
+                                    'success'
+                                );
+
+                                GenerateShippingLabelTable(response.result);
+                            }
+                        },
+                        error: function (error) {
+                            Swal.fire(
+                                'Error!',
+                                'Failed to delete record.',
+                                'error'
+                            );
+                        }
+                    });
+                  
+                } else if (result.dismiss === Swal.DismissReason.cancel) {
+                    Swal.fire({
+                        title: 'Cancelled',
+                        text: 'Your record is safe :)',
+                        icon: 'error',
+                        customClass: {
+                            confirmButton: 'btn btn-success waves-effect waves-light'
+                        }
+                    });
+                }
+            });
+        }
+
+        function s2ab(s) {
+            const buf = new ArrayBuffer(s.length);
+            const view = new Uint8Array(buf);
+            for (let i = 0; i < s.length; i++) {
+                view[i] = s.charCodeAt(i) & 0xFF;
+            }
+            return buf;
+        }
+
+        function formatDateTime(dateString) {
+
+            if (!dateString) {
+                return '';
+            }
+            const date = new Date(dateString);
+
+            // Define options for formatting date and time
+            const dateOptions = {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            };
+            const timeOptions = {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            };
+
+            // Format date and time separately
+            const formattedDate = new Intl.DateTimeFormat('en-GB', dateOptions).format(date); // 'DD/MM/YYYY'
+            const formattedTime = new Intl.DateTimeFormat('en-US', timeOptions).format(date); // 'HH:MM AM/PM'
+
+            // Combine formatted date and time
+            return `${formattedDate} ${formattedTime}`;
+        }
+    </script>
+    <script>
+        function isNumberAndDecimal(evt, element) {
+            var charCode = (evt.which) ? evt.which : evt.keyCode;
+            var value = element.value;
+            var dotContains = value.indexOf('.') !== -1;
+            if (dotContains && charCode == 46) {
+                return false;
+            }
+            if (charCode > 31 && (charCode < 48 || charCode > 57) && charCode != 46) {
+                return false;
+            }
+            return true;
+        }
+
+        function Whitespace(e) {
+            var key = event.keyCode || event.which;
+
+            // Get the current value in the textbox
+            var inputValue = event.target.value;
+
+            // Check if the pressed key is a valid character (alphanumeric) or space
+            var inputChar = String.fromCharCode(key);
+            var pattern = /^[a-zA-Z0-9]+( [a-zA-Z0-9]+)*$/; // Allow words separated by a single space
+
+            // Check if the entered character combined with the existing text violates the pattern
+            if (!pattern.test((inputValue + inputChar).trim()) || /^\s/.test(inputValue + inputChar)) {
+                event.preventDefault();
+                return false;
+            }
+            return true;
+        }
+    </script>
+}

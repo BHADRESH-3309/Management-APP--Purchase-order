@@ -37,7 +37,9 @@ namespace WebManagementApp.Models
         [DisplayName("Source:")]
         public string? ProductSource { get; set; }
         public string Brand { get; set; }
-        public Guid idBrand { get; set; }
+
+        [Required(ErrorMessage = "Please select a Brand.")]
+        public Guid? idBrand { get; set; }
         public bool IsError { get; set; } = true;
         public string? Message { get; set; }
 
@@ -57,8 +59,10 @@ namespace WebManagementApp.Models
         public bool IsBtoB { get; set; }
         [DisplayName("B2B Margin(%):")]
         public string? BtoBMargin { get; set; }
-        [DisplayName("Marketplace Margin(%):")]
+        [DisplayName("Marketplace FBM Margin(%):")]
         public string? MarketplaceMargin { get; set; }
+        [DisplayName("Marketplace FBA Margin(%):")]
+        public string? MarketplaceFBAMargin { get; set; }
 
         // [DisplayName("Product Cost (£):")]
         // [RegularExpression("^[0-9]*\\.?[0-9]+$", ErrorMessage = "Please enter valid product cost")]
@@ -89,6 +93,18 @@ namespace WebManagementApp.Models
       //  public List<StockLocationDetailVM> StockLocationDetails { get; set; } = new List<StockLocationDetailVM>();
       //  public List<string> StockLocations { get; set; } = new List<string>();
         public List<BrandVM> brandlist { get; set; }
+        public List<ShippingLabelVM> shippingLabelList { get; set; }
+        public List<CategoryVM> categoryList { get; set; }
+        [Required(ErrorMessage = "Please select a Category.")]
+        public Guid? idCategory {  get; set; }
+        [Required(ErrorMessage = "Please select a Shipping Label.")]
+        public Guid? idShippingLabel { get; set;}
+
+        [DisplayName("Category")]
+        public string CategoryName { get; set; }
+
+        [DisplayName("Shipping Label")]
+        public string ShippingLabelName { get; set; }
     }
     public class StockLocationDetailVM
     {
@@ -109,12 +125,27 @@ namespace WebManagementApp.Models
         public string Brand { get; set; }
 
         public string DateAdd { get; set; }
+        public string Mode { get; set; }
 
     }
     public class ImportResult
     {
         public DataTable NewData { get; set; }
         public DataTable UpdatedData { get; set; }
+    }
+
+    public class ShippingLabelVM
+    {
+        public Guid idShippingLabel { get; set; }
+
+        public string ShippingLabelName { get; set; }
+    }
+
+    public class CategoryVM
+    {
+        public Guid idCategory { get; set; }
+
+        public string CategoryName { get; set; }
     }
 }
 

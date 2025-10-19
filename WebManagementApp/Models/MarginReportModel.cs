@@ -25,5 +25,16 @@
         public int BundleQty { get; set; }
         public int Quantity { get; set; }
         public decimal TotalAvgCostPrice { get; set; }
+        public decimal ReferralFee { get; set; }
+        public decimal VariableClosingFee { get; set; }
+        public decimal FBAFees { get; set; }
+        public decimal ShippingFee { get; set; }
+        public decimal FinalValueFee { get; set; }
+        public decimal ListingFee { get; set; }
+        public decimal TransactionFee { get; set; }
+        public decimal BoostFee { get; set; }
+        public decimal SalesFee { get; set; }
+        public string FulfillmentChannel { get; set; }
+        public string CategoryName { get; set; }
     }
 }

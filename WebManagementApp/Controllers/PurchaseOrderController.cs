@@ -354,7 +354,7 @@ namespace WebManagementApp.Controllers
 
 
         [HttpGet]
-        public ActionResult UpdatePurchaseOrderDemo(string id)
+        public ActionResult UpdatePurchaseOrderNew(string id)
         {
             var model = new PurchaseOrderModel();
             try
@@ -368,7 +368,7 @@ namespace WebManagementApp.Controllers
         }
 
         [HttpPost]
-        public ActionResult UpdatePurchaseOrderDemo(PurchaseOrderModel model)
+        public ActionResult UpdatePurchaseOrderNew(PurchaseOrderModel model)
         {
             string userName = HttpContext.Session.GetString("Email");
             try

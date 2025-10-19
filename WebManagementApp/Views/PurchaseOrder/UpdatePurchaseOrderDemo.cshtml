@@ -147,15 +147,24 @@
                                             <input type="hidden" asp-for="@Model.ItemsList[i].ItemName" />
                                         </td>
 
-                                        <td class="totalQuantity">
+                                        <td class="totalQuantity text-center">
                                             @Model.ItemsList[i].Quantity
                                             <input type="hidden" asp-for="@Model.ItemsList[i].Quantity" />
                                         </td>
 
-                                        <td class="previousReceived">
+                                        <td class="previousReceived text-center">
                                             @Model.ItemsList[i].ReceivedCount
                                             <input type="hidden" asp-for="@Model.ItemsList[i].ReceivedCount" />
-                                        </td>
+                                            @{
+                                                var remainingQty = Model.ItemsList[i].Quantity - Model.ItemsList[i].ReceivedCount;
+                                            }
+
+                                            @if (remainingQty > 0)
+                                            {
+                                                <span class="badge text-bg-success" style="--bs-badge-font-size: 0.95em;">
+                                                    Remaining Qty: @remainingQty
+                                                </span>
+                                            }
 
                                         <td>
                                             <input asp-for="@Model.ItemsList[i].AmershamQuantity"
@@ -364,13 +373,14 @@
                 const missingVal = missingInput ? parseInt(missingInput.value.trim()) || 0 : 0;
 
                 const sumInputs = amershamVal + watfordVal + damageVal + missingVal;
-
+                 if (idStatus.value !== 'Damage Received') {
                 // Check sum does not exceed remaining quantity
                 if (sumInputs > remainingQty) {
                     //toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
                     isValidInputs.value = false;
                     hasValidDelivery = false;
                     //return;
+                }
                 }
 
                 // Check at least one row has delivery if status requires it
@@ -389,11 +399,14 @@
             }
 
             if (idStatus.value === 'Damage Received') {
-               if (sumInputs > remainingQty) {
-                        //toastr.error(`For 'Damage Received', Damage Count must equal the total quantity (${totalQty}) for SKU "${row.querySelector('.item-sku-label').value}".`);
+               if (sumInputs != remainingQty) {
+                        toastr.error(`For 'Damage Received', Damage Count must equal the total remaining quantity (${totalQty}) for SKU "${row.querySelector('.item-sku-label').value}".`);
                         isValidInputs.value = false;
                         hasValidDelivery = false;
                         //return;
+                    }else if(sumInputs === remainingQty){
+                     isValidInputs.value = true;
+                        hasValidDelivery = true;
                     }
             }
 
@@ -464,19 +477,26 @@
             const missingVal = parseInt(missingInput?.value.trim()) || 0;
 
             const sumInputs = amershamVal + watfordVal + damageVal + missingVal;
-
+            var skuTxt = row.querySelector('.item-sku-label').textContent;
             let isValid = true;
-
+            const status = document.getElementById('Status').value;
             // 1️⃣ Check sum does not exceed remaining quantity
+            if (status !== 'Damage Received') {
             if (sumInputs > remainingQty) {
-                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                toastr.error(`Row with SKU "${skuTxt}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
                 isValid = false;
             }
-            const status = document.getElementById('Status').value;
+            }
+            
             if (status === 'Damage Received') {
-                if (sumInputs > remainingQty) {
-                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                if (sumInputs !== remainingQty) {
+                    
+                //toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                toastr.error(`For 'Damage Received', Damage Count must equal the total remaining quantity (${remainingQty}) for SKU "${skuTxt}".`);
+
                 isValid = false;
+            }else if (sumInputs === remainingQty){
+                isValid = true;
             }     
             }
 

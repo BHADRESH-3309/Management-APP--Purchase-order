@@ -17,14 +17,15 @@ namespace WebManagementApp.DataAccess.Services
         private readonly string _companyAVASupplies;
         Guid idMasterSKU = Guid.Empty;
         string masterSKU = string.Empty, userName = string.Empty;
-
-        public PurchaseOrderService(ISqlDataAccess db, IConfiguration configuration, IWebHostEnvironment hostEnvironment)
+        private readonly IMasterInventoryService _masterInventoryService;
+        public PurchaseOrderService(ISqlDataAccess db, IConfiguration configuration, IWebHostEnvironment hostEnvironment, IMasterInventoryService masterInventoryService)
         {
             _db = db;
             _configuration = configuration;
             _hostEnvironment = hostEnvironment;
             _companyGreenwize = configuration["CompanyName:CompanyName1"];
             _companyAVASupplies = configuration["CompanyName:CompanyName2"];
+            _masterInventoryService = masterInventoryService;
         }
 
         /* Create Purchase order page - Start * 
@@ -72,17 +73,17 @@ namespace WebManagementApp.DataAccess.Services
             string query = string.Empty;
             try
             {
-                if(type == "Master SKU")
+                if (type == "Master SKU")
                 {
                     query = @"SELECT m.Title AS ItemName, b.Brand, m.GTIN from tblMasterSKU m Inner join tblBrand b 
                                 ON m.idBrand = b.idBrand WHERE m.SKU = @selectedDropdownValue";
                 }
 
-                if(type == "GTIN")
+                if (type == "GTIN")
                 {
                     query = @"SELECT m.SKU AS MasterSKU, m.Title AS ItemName, b.Brand from tblMasterSKU m Inner join tblBrand b 
                                 ON m.idBrand = b.idBrand WHERE m.GTIN = @selectedDropdownValue";
-                    
+
                 }
                 var result = await _db.GetData<PurchaseOrderItemViewModel, dynamic>(query, new { selectedDropdownValue });
                 response.IsError = false;
@@ -131,7 +132,7 @@ namespace WebManagementApp.DataAccess.Services
 
                 // Insert PO Number into Inventory Claims
                 string insertPONumberQuery = @"INSERT INTO tblInventoryClaims (idPurchaseOrder) VALUES (@idPurchaseOrder)";
-                await _db.ExecuteDML(insertPONumberQuery, new {idPurchaseOrder = idPONumber});
+                await _db.ExecuteDML(insertPONumberQuery, new { idPurchaseOrder = idPONumber });
 
                 // Insert each purchase order item(product)
                 if (model.Items != null && model.Items.Any())
@@ -312,7 +313,7 @@ namespace WebManagementApp.DataAccess.Services
 
                     foreach (var item in model.Items)
                     {
-                        if (item.idPurchaseOrderProduct != Guid.Empty)   
+                        if (item.idPurchaseOrderProduct != Guid.Empty)
                         {
                             await _db.ExecuteDML(updateItemQuery, new
                             {
@@ -322,11 +323,11 @@ namespace WebManagementApp.DataAccess.Services
                                 brand = item.Brand,
                                 gtin = item.GTIN,
                                 quantity = item.Quantity,
-                                price = item.Price,                               
+                                price = item.Price,
                                 exchange = item.Exchange
                             });
                         }
-                        else    
+                        else
                         {
                             await _db.ExecuteDML(insertItemQuery, new
                             {
@@ -339,7 +340,7 @@ namespace WebManagementApp.DataAccess.Services
                                 item.Price,
                                 item.Exchange
                             });
-                        }                     
+                        }
                     }
                 }
 
@@ -357,7 +358,7 @@ namespace WebManagementApp.DataAccess.Services
         // Delete purchase order product.
         public async Task DeleteProduct(string productId)
         {
-            await _db.ExecuteDML("DELETE from tblPurchaseOrderProduct WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct", 
+            await _db.ExecuteDML("DELETE from tblPurchaseOrderProduct WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct",
                 new { idPurchaseOrderProduct = productId });
         }
         /* Edit Purchase order page - End */
@@ -413,7 +414,7 @@ namespace WebManagementApp.DataAccess.Services
             return poNumberList;
         }
 
-       // Method to fetch purchase order data.
+        // Method to fetch purchase order data.
         public async Task<ResponseModel> GetPurchaseOrder(string status, string supplierName, string brand, string poNumber)
         {
             ResponseModel response = new ResponseModel();
@@ -522,85 +523,85 @@ ORDER BY
             return response;
         }
 
-    //    public async Task<ResponseModel> GetPurchaseOrder(string status, string supplierName, string brand, string poNumber)
-    //    {
-    //        ResponseModel response = new ResponseModel();
-    //        List<string> conditions = new List<string>();
-    //        try
-    //        {
-    //            string query =
-    //            @$"SELECT po.idPurchaseOrder, pop.idPurchaseOrderProduct, po.PONumber, pop.MasterSKU, 
-    //                pop.ItemName, pop.Brand, po.SupplierName, pop.Quantity, (pop.Quantity * pop.Price) AS Price, 
-    //                po.Currency, pop.Exchange, po.DeliveryDate, po.Note, pop.Status, pop.ReceivedDate, pop.DamageCount, 
-    //                pop.MissingCount, ISNULL(t.ReceivedCount, 0) AS ReceivedCount, pop.IssueDescription, po.InvoiceName,
-    //                SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS AmershamQty,
-    //                SUM(CASE WHEN sl.StockLocation = 'Watford' THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS WatfordQty ,
-    //                SUM(CASE WHEN sl.StockLocation IN ('Amersham','Watford') THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS TotalQty	
-    //            FROM tblPurchaseOrder po INNER JOIN tblPurchaseOrderProduct pop ON po.idPurchaseOrder = pop.idPurchaseOrder
-    //            INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU
-    //            LEFT JOIN tblStockLocation sl ON sl.idMasterSKU = m.idMasterSKU 
-    //            OUTER APPLY (SELECT SUM(ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + 
-    //            ISNULL(WatfordQuantity, 0)) AS ReceivedCount FROM tblPurchaseOrderProductHistory poph 
-				//WHERE poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct) t ";
+        //    public async Task<ResponseModel> GetPurchaseOrder(string status, string supplierName, string brand, string poNumber)
+        //    {
+        //        ResponseModel response = new ResponseModel();
+        //        List<string> conditions = new List<string>();
+        //        try
+        //        {
+        //            string query =
+        //            @$"SELECT po.idPurchaseOrder, pop.idPurchaseOrderProduct, po.PONumber, pop.MasterSKU, 
+        //                pop.ItemName, pop.Brand, po.SupplierName, pop.Quantity, (pop.Quantity * pop.Price) AS Price, 
+        //                po.Currency, pop.Exchange, po.DeliveryDate, po.Note, pop.Status, pop.ReceivedDate, pop.DamageCount, 
+        //                pop.MissingCount, ISNULL(t.ReceivedCount, 0) AS ReceivedCount, pop.IssueDescription, po.InvoiceName,
+        //                SUM(CASE WHEN sl.StockLocation = 'Amersham' THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS AmershamQty,
+        //                SUM(CASE WHEN sl.StockLocation = 'Watford' THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS WatfordQty ,
+        //                SUM(CASE WHEN sl.StockLocation IN ('Amersham','Watford') THEN ISNULL(sl.Quantity,0) ELSE 0 END) AS TotalQty	
+        //            FROM tblPurchaseOrder po INNER JOIN tblPurchaseOrderProduct pop ON po.idPurchaseOrder = pop.idPurchaseOrder
+        //            INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU
+        //            LEFT JOIN tblStockLocation sl ON sl.idMasterSKU = m.idMasterSKU 
+        //            OUTER APPLY (SELECT SUM(ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + 
+        //            ISNULL(WatfordQuantity, 0)) AS ReceivedCount FROM tblPurchaseOrderProductHistory poph 
+        //WHERE poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct) t ";
 
-    //            if (status != "All")
-    //            {
-    //                conditions.Add($"pop.Status = '{status}' ");
-    //            }
+        //            if (status != "All")
+        //            {
+        //                conditions.Add($"pop.Status = '{status}' ");
+        //            }
 
-    //            if (poNumber != "All")
-    //            {
-    //                conditions.Add($"po.PONumber = '{poNumber}' ");
-    //            }
+        //            if (poNumber != "All")
+        //            {
+        //                conditions.Add($"po.PONumber = '{poNumber}' ");
+        //            }
 
-    //            if (supplierName != "All")
-    //            {
-    //                conditions.Add($"po.SupplierName = '{supplierName}' ");
-    //            }
+        //            if (supplierName != "All")
+        //            {
+        //                conditions.Add($"po.SupplierName = '{supplierName}' ");
+        //            }
 
-    //            if (brand != "All")
-    //            {
-    //                if (brand.Contains(","))
-    //                {
-    //                    // Handle multiple brands
-    //                    var brandNames = brand
-    //                        .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-    //                        .Select(b => $"'{b.Trim().Replace("'", "''")}'"); // Escape each brand safely
+        //            if (brand != "All")
+        //            {
+        //                if (brand.Contains(","))
+        //                {
+        //                    // Handle multiple brands
+        //                    var brandNames = brand
+        //                        .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+        //                        .Select(b => $"'{b.Trim().Replace("'", "''")}'"); // Escape each brand safely
 
-    //                    string inClause = string.Join(",", brandNames);
-    //                    conditions.Add($"pop.Brand IN ({inClause}) ");
-    //                }
-    //                else
-    //                {
-    //                    // Handle single brand
-    //                    string escapedBrandName = brand.Replace("'", "''");
-    //                    conditions.Add($"pop.Brand = '{escapedBrandName}' ");
-    //                }
-    //            }
+        //                    string inClause = string.Join(",", brandNames);
+        //                    conditions.Add($"pop.Brand IN ({inClause}) ");
+        //                }
+        //                else
+        //                {
+        //                    // Handle single brand
+        //                    string escapedBrandName = brand.Replace("'", "''");
+        //                    conditions.Add($"pop.Brand = '{escapedBrandName}' ");
+        //                }
+        //            }
 
-    //            if (conditions.Any())
-    //            {
-    //                query = query + ("WHERE " + string.Join(" AND ", conditions) + " ");
-    //            }
+        //            if (conditions.Any())
+        //            {
+        //                query = query + ("WHERE " + string.Join(" AND ", conditions) + " ");
+        //            }
 
-    //            query = query + @$" GROUP BY po.idPurchaseOrder, pop.idPurchaseOrderProduct, po.PONumber, pop.MasterSKU, 
-    //                            pop.ItemName, pop.brand, po.SupplierName, pop.Quantity, pop.Price, po.Currency, 
-    //                            pop.Exchange, po.DeliveryDate, po.Note, pop.Status, pop.ReceivedDate, pop.DamageCount, 
-    //                            pop.MissingCount, pop.IssueDescription, po.InvoiceName, po.DateAdd , t.ReceivedCount
-    //                            order by po.PONumber, po.DateAdd desc";
+        //            query = query + @$" GROUP BY po.idPurchaseOrder, pop.idPurchaseOrderProduct, po.PONumber, pop.MasterSKU, 
+        //                            pop.ItemName, pop.brand, po.SupplierName, pop.Quantity, pop.Price, po.Currency, 
+        //                            pop.Exchange, po.DeliveryDate, po.Note, pop.Status, pop.ReceivedDate, pop.DamageCount, 
+        //                            pop.MissingCount, pop.IssueDescription, po.InvoiceName, po.DateAdd , t.ReceivedCount
+        //                            order by po.PONumber, po.DateAdd desc";
 
-    //            var result = await _db.GetData<PurchaseOrderModel, dynamic>(query, new { });
-    //            response.Result = result;
-    //            response.IsError = false;
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            response.Message = ex.Message;
-    //            response.IsError = true;
-    //        }
+        //            var result = await _db.GetData<PurchaseOrderModel, dynamic>(query, new { });
+        //            response.Result = result;
+        //            response.IsError = false;
+        //        }
+        //        catch (Exception ex)
+        //        {
+        //            response.Message = ex.Message;
+        //            response.IsError = true;
+        //        }
 
-    //        return response;
-    //    }
+        //        return response;
+        //    }
 
         //    /* Purchase order List page - End */
 
@@ -621,19 +622,19 @@ ORDER BY
             var result = _db.GetData<PurchaseOrderModel, dynamic>(query, new { Id = id })
                             .GetAwaiter().GetResult().FirstOrDefault();
 
-            return result ?? new PurchaseOrderModel(); 
+            return result ?? new PurchaseOrderModel();
         }
 
         // To update purchase order item.
         public PurchaseOrderModel UpdatePurchaseOrder(PurchaseOrderModel model, string userName)
         {
             string query = string.Empty;
-      
+
             query = @"UPDATE tblPurchaseOrderProduct SET ReceivedDate = @receivedDate, 
                     MissingCount = @missingCount, DamageCount = @damageCount, IssueDescription = @issueDescription,
                     AmershamQuantity = @amershamQuantity, WatfordQuantity = @watfordQuantity,
                     ModifyDate = GetDate() WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct";
-            _db.ExecuteDML(query, new 
+            _db.ExecuteDML(query, new
             {
                 idPurchaseOrderProduct = model.idPurchaseOrderProduct,
                 status = model.Status,
@@ -650,7 +651,7 @@ ORDER BY
             {
                 AddWarehouseQuantity(model.MasterSKU, model.AmershamQty, model.WatfordQty, userName).GetAwaiter().GetResult();
             }
-            
+
             InsertPurchaseOrderProductHistory(model.idPurchaseOrderProduct, model.MasterSKU, model.Quantity,
                  model.Status, model.ReceivedDate, model.DamageCount, model.MissingCount, model.IssueDescription,
                  model.AmershamQty, model.WatfordQty).GetAwaiter().GetResult();
@@ -802,7 +803,7 @@ ORDER BY
         // To insert stock details for the history.
         private async Task InsertStockLocationHistory(object idStockLocation, string stockLocation, string quantity,
             string currentQuantity)
-        { 
+        {
             string historyQuery =
                 @"INSERT INTO tblStockLocationHistory(idStockLocation, MasterSKU, StockLocation, Quantity, DateAdd, 
                 TotalQuantity, Username, CompanyName) 
@@ -833,7 +834,7 @@ ORDER BY
         }
 
         private async Task InsertPurchaseOrderProductHistory(Guid idPurchaseOrderProduct, string masterSKU, int quantity,
-                string? status, DateTime? receivedDate, int damageCount, int missingCount, string? issueDescription, 
+                string? status, DateTime? receivedDate, int damageCount, int missingCount, string? issueDescription,
                 string? amershamQuantity, string? watfordQuantity)
         {
             string historyQuery = @"INSERT INTO tblPurchaseOrderProductHistory(idPurchaseOrderProduct, MasterSKU, Quantity, 
@@ -850,10 +851,10 @@ ORDER BY
                 receivedDate,
                 damageCount,
                 missingCount,
-                issueDescription, 
+                issueDescription,
                 amershamQuantity,
                 watfordQuantity,
-                dateAdd = DateTime.Now             
+                dateAdd = DateTime.Now
             });
         }
 
@@ -879,13 +880,13 @@ ORDER BY
 
                 var result = await _db.GetData<PurchaseOrderModel, dynamic>(query, new { });
                 response.Result = result;
-                response.IsError = false;              
+                response.IsError = false;
             }
             catch (Exception ex)
             {
                 response.Message = ex.Message;
                 response.IsError = true;
-            }            
+            }
             return response;
         }
 
@@ -1023,7 +1024,7 @@ ORDER BY
                                             new { id });
                     response = purchaseOrderList.FirstOrDefault();
 
-                    
+
 
                     if (response?.idPurchaseOrder != Guid.Empty)
                     {
@@ -1060,20 +1061,27 @@ ORDER BY
 
                         response.ItemsList = items.ToList();
                     }
-                  
+
                 }
             }
             catch (Exception ex)
             {
-                
+
             }
             return response;
         }
 
         public PurchaseOrderModel UpdatePurchaseOrderList(PurchaseOrderModel model, string userName)
         {
-            if (model.idPurchaseOrder != Guid.Empty && model.ItemsList != null && model.ItemsList.Where(x=>x.IsValid).ToList().Count > 0)
+            if (model.idPurchaseOrder != Guid.Empty && model.ItemsList != null && model.ItemsList.Where(x => x.IsValid).ToList().Count > 0)
             {
+
+
+
+
+
+
+
                 /* Update Purchase Order  */
                 string updatePOQuery = string.Empty;
                 updatePOQuery = @"UPDATE tblPurchaseOrder SET Status = @status, ReceivedDate = @receivedDate,
@@ -1088,8 +1096,15 @@ ORDER BY
                 /* Update Purchase Order List */
                 foreach (var item in model.ItemsList.Where(x => x.IsValid).ToList())
                 {
-                    string query = string.Empty;
+                    // GET Item Unit Price
+                    string purchaseOrderDetailsUnitPrice = @"SELECT * FROM tblPurchaseOrderProduct WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct";
 
+                    var purchaseOrderList = _db.GetData<PurchaseOrderItemViewModel, dynamic>(purchaseOrderDetailsUnitPrice,
+                                            new { item.idPurchaseOrderProduct }).GetAwaiter().GetResult(); ;
+                    PurchaseOrderItemViewModel response = purchaseOrderList.FirstOrDefault();
+
+
+                    string query = string.Empty;
                     query = @"UPDATE tblPurchaseOrderProduct SET ReceivedDate = @receivedDate, 
                     MissingCount = @missingCount, DamageCount = @damageCount, IssueDescription = @issueDescription,
                     AmershamQuantity = @amershamQuantity, WatfordQuantity = @watfordQuantity,
@@ -1106,15 +1121,28 @@ ORDER BY
                         watfordQuantity = item.WatfordQuantity
                     });
 
-                    // Function call
-                    if (item.AmershamQuantity != null || item.WatfordQuantity != null)
-                    {
-                        AddWarehouseQuantity(item.MasterSKU, item.AmershamQuantity.ToString(), item.WatfordQuantity.ToString(), userName).GetAwaiter().GetResult();
-                    }
-
+                    
                     InsertPurchaseOrderProductHistory(item.idPurchaseOrderProduct, item.MasterSKU, item.Quantity,
                          model.Status, model.ReceivedDate, item.DamageCount, item.MissingCount, item.IssueDescription,
                          item.AmershamQuantity.ToString(), item.WatfordQuantity.ToString()).GetAwaiter().GetResult();
+
+                    if (model.Status == "Fully Received" || model.Status == "Partial Received")
+                    {
+                        if (item.AmershamQuantity > 0 || item.WatfordQuantity > 0)
+                        {
+                            _masterInventoryService.AddWarehouseQuantity(item.MasterSKU, ((item.AmershamQuantity > 0)?item.AmershamQuantity.ToString():null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null),
+                                response.Price, model.SupplierName, userName);
+                        }
+
+                        if(item.DamageCount > 0)
+                            _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, null, item.DamageCount.ToString(), userName).GetAwaiter().GetResult();
+
+                    }
+                    else if (model.Status == "Damage Received")
+                    {
+                        _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, ((item.AmershamQuantity > 0) ? item.AmershamQuantity.ToString() : null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null), userName).GetAwaiter().GetResult(); 
+                    }
+
                 }
             }
             return model;

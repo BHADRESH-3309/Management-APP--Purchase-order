@@ -34,6 +34,11 @@ namespace WebManagementApp.Controllers
             {
                 ViewData["ErrorMessage"] = ex.Message;
             }
+            var lastPoNumber = _purchaseOrderService.GetLastPoNumber();
+            if (!string.IsNullOrWhiteSpace(lastPoNumber))
+                ViewData["lastPoNumber"] = lastPoNumber;
+            else
+                ViewData["lastPoNumber"] = "1001";
             return View(model);
         }
 
@@ -346,5 +351,38 @@ namespace WebManagementApp.Controllers
             return Json(result);
         }
         /* Stock Aging Report page - End */
+
+
+        [HttpGet]
+        public ActionResult UpdatePurchaseOrderDemo(string id)
+        {
+            var model = new PurchaseOrderModel();
+            try
+            {
+                model = _purchaseOrderService.GetPurchaseOrderDetailsList(id).Result;
+            }
+            catch (Exception ex)
+            {
+            }
+            return View(model);
+        }
+
+        [HttpPost]
+        public ActionResult UpdatePurchaseOrderDemo(PurchaseOrderModel model)
+        {
+            string userName = HttpContext.Session.GetString("Email");
+            try
+            {
+                 _purchaseOrderService.UpdatePurchaseOrderList(model, userName);
+                TempData["SuccessMessage"] = "Purchase Order updated successfully!";
+                return RedirectToAction("PurchaseOrder");
+            }
+            catch (Exception ex)
+            {
+                ViewData["ErrorMessage"] = ex.Message;
+                return View(model);
+            }
+        }
+
     }
 }

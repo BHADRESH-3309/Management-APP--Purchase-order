@@ -1,0 +1,513 @@
+﻿@model WebManagementApp.Models.PurchaseOrderModel
+
+
+
+@{
+    ViewData["Title"] = "Update Purchase Order";
+}
+
+@if (ViewData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (ViewData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" id="alertMessage">
+        @ViewData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+
+
+    <style>
+
+    tr.danger-custom > td {
+        background-color: #ffb3b3 !important;
+    }
+        .item-name-label {
+            width: 120px !important;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+
+        #poFieldsRow.create-mode .supplier-col,
+        #poFieldsRow.create-mode .delivery-col {
+            flex: 0 0 50% !important; /* col-md-6 */
+            max-width: 50% !important;
+        }
+
+        #poFieldsRow.edit-mode .supplier-col,
+        #poFieldsRow.edit-mode .delivery-col {
+            flex: 0 0 50% !important; /* col-md-6 */
+            max-width: 50% !important;
+        }
+
+        @@media screen and (max-width: 550px) {
+            .supplier-col {
+                margin-bottom: 10px !important;
+            }
+
+            #poFieldsRow.edit-mode .supplier-col,
+            #poFieldsRow.edit-mode .delivery-col {
+                margin-top: 10px !important;
+                margin-bottom: 0px !important;
+                flex: none !important; /* col-md-4 */
+                max-width: none !important;
+            }
+        }
+    </style>
+
+
+<div class="card">
+    <form asp-controller="PurchaseOrder" asp-action="UpdatePurchaseOrderDemo" class="needs-validation" method="post" id="updatepurchaseOrderForm" enctype="multipart/form-data" novalidate>
+        @Html.HiddenFor(m => m.idPurchaseOrder)
+        @Html.HiddenFor(m => m.SupplierName)
+        <div class="card-body">
+            <div class="mb-3 row mt-4 d-flex" id="poFieldsRow">
+                <div class="col-md-6" id="poNumberContainer">
+                    <label class="form-label" for="poNumber">PO Number:</label>
+                    <input asp-for="PONumber" type="text" class="typeahead_Supplier form-control" 
+                           value="@Model.PONumber" disabled>
+                </div>
+                <div class="col-md-6" id="supplierContainer">
+                    <label class="form-label" for="supplierName">Supplier Name:</label>
+                    <input asp-for="SupplierName"  type="text" class="typeahead_Supplier form-control" 
+                           value="@Model.SupplierName" disabled>
+                           
+                </div>
+
+                <div class="delivery-col col-md-6">
+                    <label asp-for="Status" class="form-label" >Status</label>
+                    <select asp-for="Status" class="form-select"  >
+                        <option selected value="Select">Select</option>
+                        <option value="Created">Created</option>
+                        <option value="Submitted">Submitted</option>
+                        <option value="Partial Received">Partial Received</option>
+                        <option value="Fully Received">Fully Received</option>
+                        <option value="Damage Received">Damage Received</option>
+                        <option value="Overdue as per Expected delivery date">Overdue as per Expected delivery date</option>
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger" id="statusError"></span>
+                </div>
+                <div class="col-md-6" id="receivedDateContainer">
+                    <label asp-for="ReceivedDate" class="form-label" ></label>
+                    <input asp-for="ReceivedDate" type="date" class="form-control" id="receivedDateInput" />
+                    <span asp-validation-for="ReceivedDate" class="text-danger" id="receivedDateError"></span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Items:</label>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped" id="itemTable">
+                        <thead>
+                            <tr>
+                                <th>GTIN</th>
+                                <th>Master SKU</th>
+                                <th>Item Name</th>
+                                <th>Total Quantity</th> 
+                                <th>Previous Received</th>
+                                <th>Amersham Quantity</th>
+                                <th>Watford Quantity</th>
+                                <th>Damage Count</th>
+                                <th>Missing Count</th>
+                                <th>Issue Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemList">
+                            @if (Model.ItemsList != null && Model.ItemsList.Any())
+                            {
+                                for (int i = 0; i < Model.ItemsList.Count; i++)
+                                {
+                                    <tr data-id="@Model.ItemsList[i].idPurchaseOrderProduct">
+                                        <td>
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].idPurchaseOrderProduct" />
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].idPurchaseOrder" />
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].GTIN" />
+                                            <input type="hidden" class="IsValidEntry" asp-for="@Model.ItemsList[i].IsValid" />
+                                            @Model.ItemsList[i].GTIN
+                                        </td>
+
+                                        <td>
+                                            <input type="hidden" class="item-sku-label" asp-for="@Model.ItemsList[i].MasterSKU" />
+                                            @Model.ItemsList[i].MasterSKU
+                                        </td>
+
+                                        <td>
+                                            <p class="item-name-label" title="@Model.ItemsList[i].ItemName">
+                                                @Model.ItemsList[i].ItemName
+                                            </p>
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].ItemName" />
+                                        </td>
+
+                                        <td class="totalQuantity">
+                                            @Model.ItemsList[i].Quantity
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].Quantity" />
+                                        </td>
+
+                                        <td class="previousReceived">
+                                            @Model.ItemsList[i].ReceivedCount
+                                            <input type="hidden" asp-for="@Model.ItemsList[i].ReceivedCount" />
+                                        </td>
+
+                                        <td>
+                                            <input asp-for="@Model.ItemsList[i].AmershamQuantity"
+                                                   type="text"
+                                                   class="form-control quantity-input inputAmersham"
+                                                   pattern="[0-9]*"
+                                                   oninput="isNumber(this)" />
+                                        </td>
+
+                                        <td>
+                                            <input asp-for="@Model.ItemsList[i].WatfordQuantity"
+                                                   type="text"
+                                                   class="form-control quantity-input inputWatford"
+                                                   pattern="[0-9]*"
+                                                   oninput="isNumber(this)" />
+                                        </td>
+
+                                        <td>
+                                            <input asp-for="@Model.ItemsList[i].DamageCount"
+                                                   type="text"
+                                                   class="form-control quantity-input inputDamage"
+                                                   pattern="[0-9]*"
+                                                   oninput="isNumber(this)" />
+                                        </td>
+
+                                        <td>
+                                            <input asp-for="@Model.ItemsList[i].MissingCount"
+                                                   type="text"
+                                                   class="form-control quantity-input inputMissing"
+                                                   pattern="[0-9]*"
+                                                   oninput="isNumber(this)" />
+                                        </td>
+
+                                        <td>
+                                            <textarea asp-for="@Model.ItemsList[i].IssueDescription"
+                                                   type="text"
+                                                      placeholder="Enter Issue Description"
+                                                      class="form-control quantity-input inputIssueDesc"></textarea>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="10" class="text-center text-muted">No items found</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitButton">Update PO</button>
+            <a href="/PurchaseOrder/PurchaseOrder" class="btn btn-info">Cancel</a>            
+        </div>
+    </form>
+
+    <div class="modal fade" id="validationSummaryModal" tabindex="-1" aria-labelledby="validationSummaryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="validationSummaryModalLabel">Review Before Submit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="validationSummaryMessage">
+                    
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="cancelValidationBtn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmValidationBtn">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Number-only input helper
+        function isNumber(input) {
+            input.value = input.value.replace(/[^0-9]/g, '');
+        }
+
+        const form = document.getElementById('updatepurchaseOrderForm');
+        const idStatus = document.getElementById('Status');
+        const receivedDateInput = document.getElementById('receivedDateInput');
+
+        // Status change handler - controls enabling/disabling of inputs per status
+        function handleStatusChange() {
+            debugger
+            const status = idStatus.value;
+
+            // Get all inputs by class inside the table
+            const amershamInputs = document.querySelectorAll('input.inputAmersham');
+            const watfordInputs = document.querySelectorAll('input.inputWatford');
+            const damageInputs = document.querySelectorAll('input.inputDamage');
+            const missingInputs = document.querySelectorAll('input.inputMissing');
+            
+
+            // Disable all inputs by default
+            amershamInputs.forEach(i => i.disabled = true);
+            watfordInputs.forEach(i => i.disabled = true);
+            damageInputs.forEach(i => i.disabled = true);
+            missingInputs.forEach(i => i.disabled = true);
+
+            // Reset all inputs to zero if disabled
+            function resetIfDisabled(inputs) {
+                inputs.forEach(i => {
+                    if (i.disabled) i.value = '0';
+                });
+            }
+
+            if (status === "Created" || status === "Submitted") {
+                // Disable all quantity inputs (Amersham, Watford, Damage, Missing)
+                // Inputs already disabled above and set to 0
+            }
+            else if (status === "Fully Received" || status === "Partial Received") {
+                // Enable all inputs
+                amershamInputs.forEach(i => i.disabled = false);
+                watfordInputs.forEach(i => i.disabled = false);
+                damageInputs.forEach(i => i.disabled = false);
+                missingInputs.forEach(i => i.disabled = false);
+            }
+            else if (status === "Damage Received") {
+                // Enable only damage inputs
+                damageInputs.forEach(i => i.disabled = false);
+            }
+            else if (status === "Overdue as per Expected delivery date") {
+                // Disable all inputs
+                // Already disabled above
+            }
+            else {
+                // Default: disable all
+            }
+
+            // Reset inputs that are disabled to zero
+            resetIfDisabled(amershamInputs);
+            resetIfDisabled(watfordInputs);
+            resetIfDisabled(damageInputs);
+            resetIfDisabled(missingInputs);
+
+            // Clear errors
+            document.getElementById('statusError').textContent = '';
+            document.getElementById('receivedDateError').textContent = '';
+        }
+
+        // Initial call on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            handleStatusChange();
+        });
+
+        idStatus.addEventListener('change', handleStatusChange);
+
+        // Submit handler
+        form.addEventListener('submit', function (event) {
+            debugger
+            $("#confirmValidationBtn").show();
+            event.preventDefault(); // Prevent default submission
+
+            // Clear errors first
+            document.getElementById('statusError').textContent = '';
+            document.getElementById('receivedDateError').textContent = '';
+
+            // Validate Status selected
+            if (idStatus.value === 'Select') {
+                document.getElementById('statusError').textContent = 'Status is required';
+                return;
+            }
+
+            // Validate received date if required
+            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && !receivedDateInput.value) {
+                document.getElementById('receivedDateError').textContent = 'Received Date is required when status is Received.';
+                receivedDateInput.focus();
+                return;
+            }
+
+            // Get all table rows
+            const rows = document.querySelectorAll('#itemList tr');
+            let validCount = 0;
+            let invalidCount = 0;
+            let hasValidDelivery = false;
+
+            // Validate per row:
+            // 1) Sum of Amersham+Watford+Damage+Missing <= Remaining Quantity (TotalQuantity - PreviousReceived)
+            // 2) At least one row has (Amersham > 0 or Watford > 0) for 'Fully Received' or 'Partial Received'
+
+            
+
+            for (const row of rows) {
+                hasValidDelivery = false
+                var rowValid =  false;
+                const totalQty = parseInt(row.querySelector('.totalQuantity').textContent.trim()) || 0;
+                const prevReceived = parseInt(row.querySelector('.previousReceived').textContent.trim()) || 0;
+                const remainingQty = totalQty - prevReceived;
+
+                const amershamInput = row.querySelector('input.inputAmersham');
+                const watfordInput = row.querySelector('input.inputWatford');
+                const damageInput = row.querySelector('input.inputDamage');
+                const missingInput = row.querySelector('input.inputMissing');
+                const isValidInputs = row.querySelector('input.IsValidEntry');
+
+                const amershamVal = amershamInput ? parseInt(amershamInput.value.trim()) || 0 : 0;
+                const watfordVal = watfordInput ? parseInt(watfordInput.value.trim()) || 0 : 0;
+                const damageVal = damageInput ? parseInt(damageInput.value.trim()) || 0 : 0;
+                const missingVal = missingInput ? parseInt(missingInput.value.trim()) || 0 : 0;
+
+                const sumInputs = amershamVal + watfordVal + damageVal + missingVal;
+
+                // Check sum does not exceed remaining quantity
+                if (sumInputs > remainingQty) {
+                    //toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                    isValidInputs.value = false;
+                    hasValidDelivery = false;
+                    //return;
+                }
+
+                // Check at least one row has delivery if status requires it
+                if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received') && (amershamVal > 0 || watfordVal > 0) && !(sumInputs > remainingQty)) {
+                    hasValidDelivery = true;
+                    isValidInputs.value = true;                    
+                }
+            
+
+            // Final validation for delivered stock presence
+            if ((idStatus.value === 'Fully Received' || idStatus.value === 'Partial Received')) {
+                //toastr.error('Add delivered stock - Both Amersham and Watford quantities are 0 for all items.');
+                //isValidInputs.value = false;
+                //hasValidDelivery = false;
+                //return;
+            }
+
+            if (idStatus.value === 'Damage Received') {
+               if (sumInputs > remainingQty) {
+                        //toastr.error(`For 'Damage Received', Damage Count must equal the total quantity (${totalQty}) for SKU "${row.querySelector('.item-sku-label').value}".`);
+                        isValidInputs.value = false;
+                        hasValidDelivery = false;
+                        //return;
+                    }
+            }
+
+            if(sumInputs == 0){
+                    hasValidDelivery = true;
+                    isValidInputs.value = true;
+                    }
+
+            // If all validations pass, submit the form
+             if (hasValidDelivery) {
+                    validCount++;
+                    isValidInputs.value = true;
+                    row.classList.remove('danger-custom');
+                } else {
+                    invalidCount++;
+                    isValidInputs.value = false;
+                    row.classList.add('danger-custom');
+                }
+         }
+            // If invalid rows exist, show modal, else submit directly
+            $("#confirmValidationBtn").show();
+            if(validCount === 0)
+            {
+                $("#confirmValidationBtn").hide();
+            }
+            if (invalidCount > 0) {
+                document.getElementById('validationSummaryMessage').textContent =
+                    `There are ${validCount} valid row(s) and ${invalidCount} invalid row(s). Do you want to submit anyway?`;
+
+                // Show the modal
+                $("#validationSummaryModal").modal("show");
+            } else {
+                 document.getElementById('validationSummaryMessage').textContent =
+                    `All ${validCount} row(s) are valid. Submit to continue.`;
+
+                // Show the modal
+                $("#validationSummaryModal").modal("show");
+            }
+            
+        });
+
+
+        $("#confirmValidationBtn").click(function(){
+            $("#updatepurchaseOrderForm").trigger("submit");
+        });
+
+                document.querySelectorAll('#itemList input.quantity-input').forEach(input => {
+            input.addEventListener('input', function () {
+                const row = this.closest('tr');
+                validateRow(row);
+            });
+        });
+
+        function validateRow(row) {
+            const totalQty = parseInt(row.querySelector('.totalQuantity').textContent.trim()) || 0;
+            const prevReceived = parseInt(row.querySelector('.previousReceived').textContent.trim()) || 0;
+            const remainingQty = totalQty - prevReceived;
+
+            const amershamInput = row.querySelector('input.inputAmersham');
+            const watfordInput = row.querySelector('input.inputWatford');
+            const damageInput = row.querySelector('input.inputDamage');
+            const missingInput = row.querySelector('input.inputMissing');
+            const isValidInput = row.querySelector('input.IsValidEntry');
+
+            const amershamVal = parseInt(amershamInput?.value.trim()) || 0;
+            const watfordVal = parseInt(watfordInput?.value.trim()) || 0;
+            const damageVal = parseInt(damageInput?.value.trim()) || 0;
+            const missingVal = parseInt(missingInput?.value.trim()) || 0;
+
+            const sumInputs = amershamVal + watfordVal + damageVal + missingVal;
+
+            let isValid = true;
+
+            // 1️⃣ Check sum does not exceed remaining quantity
+            if (sumInputs > remainingQty) {
+                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                isValid = false;
+            }
+            const status = document.getElementById('Status').value;
+            if (status === 'Damage Received') {
+                if (sumInputs > remainingQty) {
+                toastr.error(`Row with SKU "${row.querySelector('.item-sku-label').value}" exceeds remaining quantity. Sum of inputs (${sumInputs}) should not be more than remaining quantity (${remainingQty}).`);
+                isValid = false;
+            }     
+            }
+
+            
+
+            // 3️⃣ For 'Partial' or 'Fully Received' → At least one location > 0
+            if ((status === 'Fully Received' || status === 'Partial Received') && amershamVal === 0 && watfordVal === 0) {
+                toastr.error('Add delivered stock - Both Amersham and Watford quantities are 0 for all items.');
+                isValid = false;
+            }
+
+            // Apply class and update hidden input
+            if (isValid) {
+                row.classList.remove('danger-custom');
+                isValidInput.value = true;
+            } else {
+                row.classList.add('danger-custom');
+                isValidInput.value = false;
+            }
+        }
+
+        //Title hover functions.
+            $(document).on('mouseenter', '.item-name-label', function () {
+                const $this = $(this);
+                if ($this.width() < $this[0].scrollWidth) {
+                    $this.css('white-space', 'normal');
+                }
+            });
+            $(document).on('mouseleave', '.item-name-label', function () {
+                const $this = $(this);
+                $this.css('white-space', 'nowrap');
+            });
+    </script>
+}

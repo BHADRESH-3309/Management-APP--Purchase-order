@@ -35,8 +35,9 @@ namespace WebManagementApp.Models
 
         public string? Currency { get; set; }
 
+        [Required(ErrorMessage = "Currency Rate is required")]
+        [Range(typeof(decimal), "0.00000001", "99999999.99999999", ErrorMessage = "Please enter a valid exchange rate up to 8 decimal places.")]
         public decimal CurrencyRate { get; set; }
-
         public decimal Exchange { get; set; }
 
         /* Update PO fields */
@@ -98,6 +99,7 @@ namespace WebManagementApp.Models
         public List<MasterSKUList> masterSKUList { get; set; }
         public List<PONumberList> poNumberList { get; set; }
         public List<PurchaseOrderItemViewModel> Items { get; set; } = new();
+        public List<PurchaseOrderItemListModel> ItemsList { get; set; } = new();
 
         public List<SupplierList> supplerlist { get; set; }
         public List<BrandsList> brandNamelist { get; set; }
@@ -176,5 +178,23 @@ namespace WebManagementApp.Models
             public Guid idMasterSKU { get; set; }
             public string GTIN { get; set; }
         }
+
+        public class PurchaseOrderItemListModel
+        {
+            public Guid idPurchaseOrderProduct { get; set; }
+            public Guid idPurchaseOrder { get; set; }
+            public string? GTIN { get; set; }
+            public string MasterSKU { get; set; }
+            public string ItemName { get; set; }
+            public int Quantity { get; set; }
+            public int ReceivedCount { get; set; }
+            public int AmershamQuantity { get; set; }
+            public int WatfordQuantity { get; set; }
+            public int DamageCount { get; set; }
+            public int MissingCount { get; set; }
+            public string? IssueDescription { get; set; }
+            public bool IsValid { get; set; } = false;
+        }
+
     }
 }

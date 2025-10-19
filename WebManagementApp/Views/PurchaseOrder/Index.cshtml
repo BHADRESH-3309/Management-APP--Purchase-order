@@ -101,7 +101,9 @@
                 <div class="currencyRate-col col-md-6 mt-2">
                     <label class="form-label" for="currencyRate">Exchange Rate*:</label>
                     <input type="number" class="typeahead_currencyRate form-control" id="currencyRate" name="currencyRate"
-                           placeholder="Enter exchange rate" step="0.01" min="0" required>
+                           placeholder="Enter exchange rate" step="0.00000001" min="0" required
+                           value="@Model.CurrencyRate.ToString("0.##########")">
+
                     <div class="invalid-feedback">Please enter the exchange rate.</div>
                 </div>
 
@@ -150,7 +152,7 @@
             </div>
 
             <button type="submit" class="btn btn-primary" id="submitButton">Create PO</button>
-            <button type="button" class="btn btn-info editPoBtn" data-pono="1001" onclick="editPurchaseOrder(this)">Edit PO</button>
+            <button type="button" class="btn btn-info editPoBtn" data-pono="@ViewData["lastPoNumber"]" onclick="editPurchaseOrder(this)">Edit PO</button>
             <button type="button" class="btn btn-secondary" id="cancelButton" onclick="createPurchaseOrder()" style="display: none;">Cancel</button>
         </div>
     </form>
@@ -216,7 +218,7 @@
             // Create a new row element.
             const row = document.createElement('tr');
             row.innerHTML = `
-                        <td><select class="form-select gtin-select" name="Items[${index}].GTIN" style="width:120px;" required>
+                        <td><select class="form-select gtin-select" name="Items[${index}].GTIN" style="width:120px;">
                             ${gtinOptions}</select>
                             <input type="hidden" name="Items[${index}].IdPurchaseOrderProduct" />
                         </td>
@@ -351,7 +353,7 @@
        
             if (hasSubmittedOnce) {
                 validateSelect2(masterSKUSelect);
-                validateSelect2(gtinSelect);
+                //validateSelect2(gtinSelect);
             }
 
             // Update name indexes for all items (to maintain model binding on submit).
@@ -503,7 +505,8 @@
             hasSubmittedOnce = true;
             let isValid = true;
 
-            ['.master-sku-select', '.gtin-select'].forEach(selector => {
+        //  ['.master-sku-select', '.gtin-select'].forEach(selector => {
+            ['.master-sku-select'].forEach(selector => {
                 document.querySelectorAll(selector).forEach(select => {
                     const container = $(select).next('.select2-container')[0];
                     if (!select.value) {

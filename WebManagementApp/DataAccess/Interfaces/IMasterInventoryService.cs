@@ -8,9 +8,9 @@ namespace WebManagementApp.DataAccess.Interfaces
         Task<ResponseModel> GetMasterInventoryLog(string masterSKU);
         Task<ResponseModel> GetStockLocationHistoryData(string masterSKU);
 
-        Task<ResponseModel> AddWarehouseQuantity(string sku, string? amershamQuantity, string? watfordQuantity, decimal? productCost, string supplierName, string user);
+        Task<ResponseModel> AddWarehouseQuantity(string sku, string? amershamQuantity, string? watfordQuantity, decimal? productCost, string supplierName, string user, string additionalText = "");
         Task<ResponseModel> ReduceWarehouseQuantity(string sku, string? amershamQuantity, string? watfordQuantity, string reduceQuantityReason, string user);
-        Task<ResponseModel> AddWarehouseDamagedQuantity(string sku, string? amershamDamagedQuantity, string? watfordDamagedQuantity, string user);
+        Task<ResponseModel> AddWarehouseDamagedQuantity(string sku, string? amershamDamagedQuantity, string? watfordDamagedQuantity, string user, string additionalText = "");
         Task<ResponseModel> ReduceWarehouseDamagedQuantity(string sku, string? amershamDamagedQuantity, string? watfordDamagedQuantity, string user);
 
         Task<string[]> GetSupplierNames();

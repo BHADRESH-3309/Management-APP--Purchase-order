@@ -1125,22 +1125,22 @@ ORDER BY
                     InsertPurchaseOrderProductHistory(item.idPurchaseOrderProduct, item.MasterSKU, item.Quantity,
                          model.Status, model.ReceivedDate, item.DamageCount, item.MissingCount, item.IssueDescription,
                          item.AmershamQuantity.ToString(), item.WatfordQuantity.ToString()).GetAwaiter().GetResult();
-
+                    string additionalText = " Purchase order ";
                     if (model.Status == "Fully Received" || model.Status == "Partial Received")
                     {
                         if (item.AmershamQuantity > 0 || item.WatfordQuantity > 0)
                         {
                             _masterInventoryService.AddWarehouseQuantity(item.MasterSKU, ((item.AmershamQuantity > 0)?item.AmershamQuantity.ToString():null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null),
-                                response.Price, model.SupplierName, userName);
+                                response.Price, model.SupplierName, userName, additionalText);
                         }
 
                         if(item.DamageCount > 0)
-                            _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, null, item.DamageCount.ToString(), userName).GetAwaiter().GetResult();
+                            _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, null, item.DamageCount.ToString(), userName, additionalText.TrimEnd()).GetAwaiter().GetResult();
 
                     }
                     else if (model.Status == "Damage Received")
                     {
-                        _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, ((item.AmershamQuantity > 0) ? item.AmershamQuantity.ToString() : null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null), userName).GetAwaiter().GetResult(); 
+                        _masterInventoryService.AddWarehouseDamagedQuantity(item.MasterSKU, ((item.AmershamQuantity > 0) ? item.AmershamQuantity.ToString() : null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null), userName, additionalText.TrimEnd()).GetAwaiter().GetResult(); 
                     }
 
                 }

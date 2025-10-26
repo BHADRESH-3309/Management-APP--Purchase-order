@@ -73,7 +73,7 @@ namespace WebManagementApp.DataAccess.Services
 
         // Method
         public async Task<ResponseModel> AddWarehouseQuantity(string sku, string? amershamQuantity, string? watfordQuantity,
-            decimal? productCost, string supplierName, string user)
+            decimal? productCost, string supplierName, string user, string additionalText="")
         {
             ResponseModel response = new ResponseModel();
 
@@ -94,7 +94,7 @@ namespace WebManagementApp.DataAccess.Services
                     return response;
                 }
 
-                await ProcessStockLocations(existingStockLocations, amershamQuantity, watfordQuantity, cost, supplierName);
+                await ProcessStockLocations(existingStockLocations, amershamQuantity, watfordQuantity, cost, supplierName, additionalText);
                 response.Message = "Inventory warehouse quantity successfully added.";
                 return response;
             }
@@ -138,7 +138,7 @@ namespace WebManagementApp.DataAccess.Services
 
         // Method
         public async Task<ResponseModel> AddWarehouseDamagedQuantity(string sku, string? amershamDamagedQuantity,
-            string? watfordDamagedQuantity, string user)
+            string? watfordDamagedQuantity, string user, string additionalText = "")
         {
             ResponseModel response = new ResponseModel();
             masterSKU = sku;
@@ -157,9 +157,9 @@ namespace WebManagementApp.DataAccess.Services
                 }
 
                 bool isAnyLocationDamagedStockAdded = await UpdateDamagedStockForLocation("Amersham", amershamDamagedQuantity,
-                existingStockLocations);
+                existingStockLocations, additionalText);
                 isAnyLocationDamagedStockAdded |= await UpdateDamagedStockForLocation("Watford", watfordDamagedQuantity,
-                    existingStockLocations);
+                    existingStockLocations, additionalText);
 
                 if (!isAnyLocationDamagedStockAdded)
                 {
@@ -269,12 +269,12 @@ namespace WebManagementApp.DataAccess.Services
             return false;
         }
 
-        private async Task<bool> UpdateDamagedStockForLocation(string location, string? damagedQuantity, IEnumerable<StockLocationModel> stockLocations)
+        private async Task<bool> UpdateDamagedStockForLocation(string location, string? damagedQuantity, IEnumerable<StockLocationModel> stockLocations, string additionalText = "")
         {
             var locationData = stockLocations.FirstOrDefault(x => x.StockLocation == location);
             if (!string.IsNullOrEmpty(damagedQuantity) && locationData != null)
             {
-                await IncreaseStockLocationDamagedQuantity(damagedQuantity, locationData);
+                await IncreaseStockLocationDamagedQuantity(damagedQuantity, locationData, additionalText);
                 return true;
             }
             return false;
@@ -327,7 +327,7 @@ namespace WebManagementApp.DataAccess.Services
         }
 
         private async Task IncreaseStockLocationQuantity(string stockLocation, int quantityInput, string costPrice, string supplierName,
-            StockLocationModel stockLocationData)
+            StockLocationModel stockLocationData, string AdditionalText= "")
         {
             int existingQuantity = string.IsNullOrEmpty(stockLocationData.Quantity) ? 0 : int.Parse(stockLocationData.Quantity);
             var increaseQuantity = existingQuantity + quantityInput;
@@ -352,11 +352,11 @@ namespace WebManagementApp.DataAccess.Services
                 userName
             });
 
-            string logMessage = $"{userName} || {DateTime.Now:dd/MM/yyyy hh:mm tt} | {quantityInput} quantity of {stockLocation} have been added by the user from the website for {supplierName}. Current stock quantity: {increaseQuantity}.";
+            string logMessage = $"{userName} || {DateTime.Now:dd/MM/yyyy hh:mm tt} | {quantityInput} quantity of {stockLocation} have been added by the user from the website for {AdditionalText}{supplierName}. Current stock quantity: {increaseQuantity}.";
             await AddLog(logMessage);
         }
 
-        private async Task IncreaseStockLocationDamagedQuantity(string damagedQuantityInput, StockLocationModel stockLocationData)
+        private async Task IncreaseStockLocationDamagedQuantity(string damagedQuantityInput, StockLocationModel stockLocationData,string additionalText="")
         {
             int existingDamagedQuantity = string.IsNullOrEmpty(stockLocationData.DamagedQuantity) ? 0 : int.Parse(stockLocationData.DamagedQuantity);
             var increaseDamagedQuantity = existingDamagedQuantity + int.Parse(damagedQuantityInput);
@@ -377,7 +377,7 @@ namespace WebManagementApp.DataAccess.Services
                 userName
             });
 
-            string logMessage = $"{userName} || {DateTime.Now:dd/MM/yyyy hh:mm tt} | {damagedQuantityInput} damaged quantity of {stockLocation} have been added by the user from the website. Current damaged stock quantity: {increaseDamagedQuantity}.";
+            string logMessage = $"{userName} || {DateTime.Now:dd/MM/yyyy hh:mm tt} | {damagedQuantityInput} damaged quantity of {stockLocation} have been added by the user from the {(string.IsNullOrEmpty(additionalText) ? "website" : additionalText)}. Current damaged stock quantity: {increaseDamagedQuantity}.";
             await AddLog(logMessage);
         }
 
@@ -443,7 +443,7 @@ namespace WebManagementApp.DataAccess.Services
         }
 
         private async Task ProcessStockLocations(IEnumerable<StockLocationModel> existingStockLocations, string? amershamQuantity,
-            string? watfordQuantity, string costPrice, string supplierName)
+            string? watfordQuantity, string costPrice, string supplierName, string additionalText="")
         {
             // Calculate average cost
             async Task<string> ProcessLocation(string locationName, string? locationQuantity, StockLocationModel? locationData,
@@ -466,7 +466,7 @@ namespace WebManagementApp.DataAccess.Services
                 formattedAvgCost = avgCost.ToString("F2");
 
                 if (locationData != null && currentQuantity > 0)
-                    await IncreaseStockLocationQuantity(locationName, currentQuantity, costPrice, supplierName, locationData);
+                    await IncreaseStockLocationQuantity(locationName, currentQuantity, costPrice, supplierName, locationData, additionalText);
 
                 return formattedAvgCost;
             }

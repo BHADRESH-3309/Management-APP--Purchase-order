@@ -421,39 +421,22 @@ namespace WebManagementApp.DataAccess.Services
             List<string> conditions = new List<string>();
             try
             {
-                string query = @"
-                SELECT 
-    po.idPurchaseOrder, 
-    po.PONumber, 
-    po.SupplierName,   
-    ISNULL(po.Status,'Created') as [Status],
-    SUM(pop.Quantity) AS Quantity,
-    SUM(pop.Quantity * pop.Price) AS Price,
-    SUM(pop.Exchange) AS Exchange,
-    SUM(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount,
-    po.DeliveryDate,
-    po.ReceivedDate,
-    po.Note,
-    po.InvoiceName,
-    po.DateAdd   
-FROM 
-    tblPurchaseOrder po 
-    INNER JOIN tblPurchaseOrderProduct pop 
-        ON po.idPurchaseOrder = pop.idPurchaseOrder  
-    OUTER APPLY (
-        SELECT 
-            SUM(
-                ISNULL(DamageCount, 0) + 
-                ISNULL(MissingCount, 0) + 
-                ISNULL(AmershamQuantity, 0) + 
-                ISNULL(WatfordQuantity, 0)
-            ) AS ReceivedCount 
-        FROM 
-            tblPurchaseOrderProductHistory poph 
-        WHERE 
-            poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
-    ) t  
-                ";
+                string query = @"SELECT po.idPurchaseOrder, po.PONumber, po.SupplierName,   
+                ISNULL(po.Status,'Created') as [Status],SUM(pop.Quantity) AS Quantity,
+                SUM(pop.Quantity * pop.Price) AS Price,SUM(pop.Exchange) AS Exchange,
+                SUM(ISNULL(t.ReceivedCount, 0)) AS ReceivedCount,po.DeliveryDate,
+                po.ReceivedDate,po.Note,po.InvoiceName,po.DateAdd   
+                FROM tblPurchaseOrder po INNER JOIN tblPurchaseOrderProduct pop 
+                ON po.idPurchaseOrder = pop.idPurchaseOrder  
+                OUTER APPLY (SELECT SUM(
+                                        ISNULL(DamageCount, 0) + 
+                                        ISNULL(MissingCount, 0) + 
+                                        ISNULL(AmershamQuantity, 0) + 
+                                        ISNULL(WatfordQuantity, 0)
+                                    ) AS ReceivedCount 
+                                FROM tblPurchaseOrderProductHistory poph 
+                                WHERE poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
+                            ) t  ";
 
 
                 if (status != "All")
@@ -838,8 +821,8 @@ ORDER BY
                 string? amershamQuantity, string? watfordQuantity)
         {
             string historyQuery = @"INSERT INTO tblPurchaseOrderProductHistory(idPurchaseOrderProduct, MasterSKU, Quantity, 
-                Status, ReceivedDate, DamageCount, MissingCount, IssueDescription, AmershamQuantity, WatfordQuantity)
-                VALUES(@idPurchaseOrderProduct, @masterSKU, @quantity, @status, @receivedDate, @damageCount, @missingCount, 
+                ReceivedDate, DamageCount, MissingCount, IssueDescription, AmershamQuantity, WatfordQuantity)
+                VALUES(@idPurchaseOrderProduct, @masterSKU, @quantity, @receivedDate, @damageCount, @missingCount, 
                 @issueDescription, @amershamQuantity, @watfordQuantity)";
 
             await _db.ExecuteDML(historyQuery, new
@@ -847,7 +830,6 @@ ORDER BY
                 idPurchaseOrderProduct,
                 masterSKU,
                 quantity,
-                status,
                 receivedDate,
                 damageCount,
                 missingCount,
@@ -1029,32 +1011,13 @@ ORDER BY
                     if (response?.idPurchaseOrder != Guid.Empty)
                     {
                         // Get product details
-                        string itemsQuery = @"SELECT 
-	pop.idPurchaseOrderProduct,
-	pop.idPurchaseOrder, 
-	pop.GTIN,
-	pop.MasterSKU,
-	pop.ItemName,
-	pop.Quantity,
-	t.ReceivedCount,
-	0 AmershamQuantity,
-	0 WatfordQuantity,
-	0 DamageCount, 
-	0 MissingCount, 
-	pop.IssueDescription 
-	FROM
-	tblPurchaseOrderProduct pop 
-    INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU and pop.idPurchaseOrder = @idPurchaseOrder
-        OUTER APPLY (
-    SELECT 
-        SUM(
-        ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)
-        ) AS ReceivedCount 
-    FROM 
-        tblPurchaseOrderProductHistory poph 
-    WHERE 
-        poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct
-    ) t  ";
+                        string itemsQuery = @"SELECT pop.idPurchaseOrderProduct, pop.idPurchaseOrder, pop.GTIN, pop.MasterSKU, pop.ItemName,
+	                     pop.Quantity, t.ReceivedCount, 0 AmershamQuantity, 0 WatfordQuantity,
+	                     0 DamageCount, 0 MissingCount, pop.IssueDescription FROM
+	                     tblPurchaseOrderProduct pop INNER JOIN tblMasterSKU m ON pop.MasterSKU = m.SKU and pop.idPurchaseOrder = @idPurchaseOrder
+                         OUTER APPLY (SELECT SUM(ISNULL(DamageCount, 0) + ISNULL(MissingCount, 0) + ISNULL(AmershamQuantity, 0) + ISNULL(WatfordQuantity, 0)) AS ReceivedCount 
+                         FROM tblPurchaseOrderProductHistory poph 
+                         WHERE poph.idPurchaseOrderProduct = pop.idPurchaseOrderProduct) t  ";
 
                         var items = await _db.GetData<PurchaseOrderItemListModel, dynamic>(itemsQuery,
                             new { idPurchaseOrder = response?.idPurchaseOrder });
@@ -1100,7 +1063,7 @@ ORDER BY
                     string purchaseOrderDetailsUnitPrice = @"SELECT * FROM tblPurchaseOrderProduct WHERE idPurchaseOrderProduct = @idPurchaseOrderProduct";
 
                     var purchaseOrderList = _db.GetData<PurchaseOrderItemViewModel, dynamic>(purchaseOrderDetailsUnitPrice,
-                                            new { item.idPurchaseOrderProduct }).GetAwaiter().GetResult(); ;
+                                            new { item.idPurchaseOrderProduct }).GetAwaiter().GetResult(); 
                     PurchaseOrderItemViewModel response = purchaseOrderList.FirstOrDefault();
 
 
@@ -1114,11 +1077,11 @@ ORDER BY
                         idPurchaseOrderProduct = item.idPurchaseOrderProduct,
                         status = model.Status,
                         receivedDate = model.ReceivedDate,
-                        missingCount = item.MissingCount,
-                        damageCount = item.DamageCount,
+                        missingCount = item.MissingCount+ (response?.MissingCount??0),
+                        damageCount = item.DamageCount+ (response?.DamageCount ?? 0),
                         issueDescription = item.IssueDescription,
-                        amershamQuantity = item.AmershamQuantity,
-                        watfordQuantity = item.WatfordQuantity
+                        amershamQuantity = item.AmershamQuantity + (response?.AmershamQuantity ?? 0),
+                        watfordQuantity = item.WatfordQuantity + (response?.WatfordQuantity ?? 0)
                     });
 
                     
@@ -1131,7 +1094,7 @@ ORDER BY
                         if (item.AmershamQuantity > 0 || item.WatfordQuantity > 0)
                         {
                             _masterInventoryService.AddWarehouseQuantity(item.MasterSKU, ((item.AmershamQuantity > 0)?item.AmershamQuantity.ToString():null), ((item.WatfordQuantity > 0) ? item.WatfordQuantity.ToString() : null),
-                                response.Price, model.SupplierName, userName, additionalText);
+                                response.Price, model.SupplierName, userName, additionalText).GetAwaiter().GetResult();
                         }
 
                         if(item.DamageCount > 0)

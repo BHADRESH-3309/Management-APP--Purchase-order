@@ -132,6 +132,10 @@ namespace WebManagementApp.Models
 
             [Required]
             public int Quantity { get; set; }
+            public int? AmershamQuantity { get; set; }
+            public int? WatfordQuantity { get; set; }
+            public int? DamageCount { get; set; }
+            public int? MissingCount { get; set; }
 
             [Required]
             public decimal Price { get; set; }

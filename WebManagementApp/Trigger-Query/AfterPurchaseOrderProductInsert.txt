@@ -23,6 +23,6 @@ SELECT @idPurchaseOrderProduct = ins.idPurchaseOrderProduct, @MasterSKU = ins.Ma
 FROM INSERTED ins;
  
 INSERT INTO [tblPurchaseOrderProductHistory] (idPurchaseOrderProduct, MasterSKU, ItemName, Brand, GTIN, Quantity, Price, Exchange, 
-Status, ReceivedDate, DamageCount, MissingCount, IssueDescription, AmershamQuantity, WatfordQuantity)
-VALUES(@idPurchaseOrderProduct, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange, (SELECT ISNULL([Status],'Created') FROM  tblPurchaseOrder WHERE  idPurchaseOrder = (select idPurchaseOrder from tblPurchaseOrderProduct where idPurchaseOrderProduct = @idPurchaseOrderProduct) ), @ReceivedDate, 
+ReceivedDate, DamageCount, MissingCount, IssueDescription, AmershamQuantity, WatfordQuantity)
+VALUES(@idPurchaseOrderProduct, @MasterSKU, @ItemName, @Brand, @GTIN, @Quantity, @Price, @Exchange, @ReceivedDate, 
 @DamageCount, @MissingCount, @IssueDescription, @AmershamQuantity, @WatfordQuantity);
